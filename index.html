@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--BODY-START-->
+<title>Splendor Practice Engine</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: a gem merchant's counter. Table (opponents, market, bank, your hand) on the left, scouting notes on the right; stacks to one column on tablets and phones. */
+:root{
+  --bg:#e6ebee; --surface:#f6f8f9; --felt:#d3dce1; --card:#fffdf8; --ink:#17232b; --muted:#53646f; --line:#b5c2ca;
+  --accent:#8f6210; --accent-ink:#ffffff; --good:#1b7448; --warn:#a8481a;
+  --g0:#f3efe2; --g1:#2b63c9; --g2:#1f8a57; --g3:#c8372f; --g4:#2f3036; --g5:#d8a61c;
+  --g0t:#26221a; --g1t:#ffffff; --g2t:#ffffff; --g3t:#ffffff; --g4t:#ffffff; --g5t:#2a1d00;
+  --p0:#8f6210; --p1:#2b63c9; --p2:#c8372f; --p3:#1f8a57;
+  --display:"Marcellus","IBM Plex Sans Thai",Georgia,serif;
+  --body:"IBM Plex Sans Thai","Segoe UI",system-ui,-apple-system,"Leelawadee UI",Tahoma,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e171c; --surface:#17232a; --felt:#121e25; --card:#22323b; --ink:#e8eef1; --muted:#93a5af; --line:#2f424d;
+  --accent:#dba848; --accent-ink:#1b1305; --good:#4cc38a; --warn:#f08a54;
+  --g4:#3d3f47; --p0:#dba848; --p1:#6d9cf0; --p2:#ef6d64; --p3:#4cc38a; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0e171c; --surface:#17232a; --felt:#121e25; --card:#22323b; --ink:#e8eef1; --muted:#93a5af; --line:#2f424d;
+  --accent:#dba848; --accent-ink:#1b1305; --good:#4cc38a; --warn:#f08a54;
+  --g4:#3d3f47; --p0:#dba848; --p1:#6d9cf0; --p2:#ef6d64; --p3:#4cc38a; color-scheme:dark }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);padding-inline:16px;padding-block:12px 28px;-webkit-tap-highlight-color:transparent}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:disabled{cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.g0{--gc:var(--g0);--gt:var(--g0t)}.g1{--gc:var(--g1);--gt:var(--g1t)}.g2{--gc:var(--g2);--gt:var(--g2t)}
+.g3{--gc:var(--g3);--gt:var(--g3t)}.g4{--gc:var(--g4);--gt:var(--g4t)}.g5{--gc:var(--g5);--gt:var(--g5t)}
+
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;max-width:1180px;margin:0 auto 12px}
+.top h1{font:400 22px/1.1 var(--display);margin:0;letter-spacing:.02em;margin-right:auto}
+.tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 12px;min-height:38px}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn:disabled{opacity:.45}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+select.btn{padding-right:6px}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:1180px;margin:0 auto}
+@media (min-width:1000px){.layout{grid-template-columns:minmax(0,1fr) 350px;align-items:start}}
+.table{display:grid;gap:12px;min-width:0}
+.opps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+
+.pp{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:6px;min-width:0}
+.pp.cur{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.pph{display:flex;align-items:baseline;gap:6px;min-width:0}
+.seat{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:50%;width:18px;height:18px;display:inline-grid;place-items:center;flex:none;align-self:center}
+.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.lvl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);flex:none}
+.pph .pts{margin-left:auto;font:600 22px/1 var(--body);font-variant-numeric:tabular-nums;flex:none}
+.pph .pts small{font:12px var(--body);color:var(--muted);margin-left:2px}
+.inv{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;justify-items:center}
+.slot{display:grid;gap:3px;justify-items:center}
+.bon{width:22px;height:26px;border-radius:3px;background:var(--gc);color:var(--gt);border:1px solid color-mix(in srgb,var(--ink) 30%,transparent);display:grid;place-items:center;font-style:normal;font-weight:600;font-size:13px;font-variant-numeric:tabular-nums}
+.bon.zero,.chip.zero{opacity:.28}
+.bon.none{visibility:hidden}
+.chip{width:22px;height:22px;border-radius:50%;background:var(--gc);color:var(--gt);border:1px solid color-mix(in srgb,var(--ink) 30%,transparent);display:inline-grid;place-items:center;font-style:normal;font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;flex:none}
+.chip.dot{width:12px;height:12px;vertical-align:-1px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12px;color:var(--muted)}
+.resv{display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-height:20px}
+.last{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:5px;min-height:24px}
+.back{width:30px;height:42px;border-radius:4px;border:1px solid var(--line);background:repeating-linear-gradient(45deg,var(--felt),var(--felt) 4px,var(--surface) 4px,var(--surface) 8px);display:inline-grid;place-items:center;font:12px var(--display);color:var(--muted)}
+
+.market{background:var(--felt);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px}
+.row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;max-width:600px;width:100%;margin:0 auto}
+.card{container-type:inline-size;position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;width:100%;max-width:100%;aspect-ratio:5/7;border-radius:6px;border:1px solid color-mix(in srgb,var(--ink) 28%,transparent);background:var(--card);padding:0;overflow:hidden;text-align:left}
+.card.empty{border-style:dashed;background:transparent}
+.card .chd{display:flex;justify-content:space-between;align-items:center;height:36cqw;padding:0 8cqw;background:color-mix(in srgb,var(--gc) 38%,var(--card))}
+.card .cp{font:400 27cqw/1 var(--display);color:var(--ink)}
+.card .gem{width:22cqw;height:22cqw;border-radius:50%;background:var(--gc);border:1px solid color-mix(in srgb,var(--ink) 40%,transparent)}
+.card .cost{position:absolute;left:7cqw;bottom:6cqw;display:flex;flex-direction:column-reverse;gap:3cqw}
+.card .chip{width:21cqw;height:21cqw;font-size:14cqw}
+.card .lv{position:absolute;right:7cqw;bottom:5cqw;font:11cqw var(--display);color:var(--muted);letter-spacing:.1em}
+button.card:hover{border-color:var(--accent)}
+.card.can{box-shadow:0 0 0 2px color-mix(in srgb,var(--good) 70%,transparent)}
+.card.sel{box-shadow:0 0 0 3px var(--accent);transform:translateY(-3px)}
+.card.hint,.tok.hint,.deck.hint{outline:3px dashed var(--accent);outline-offset:2px}
+.card.hint2{outline:3px dotted var(--accent);outline-offset:2px}
+.cw{display:block;margin-top:5px}.cw b{color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:11px;margin-right:6px}
+.card.sm{width:44px;flex:none}
+.wrapc{position:relative;display:inline-block}
+.wrapc .tag{position:absolute;top:-6px;right:-6px;background:var(--warn);color:var(--accent-ink);border-radius:9px;font-size:10px;font-weight:600;padding:0 5px;line-height:16px}
+.deck{aspect-ratio:5/7;border-radius:6px;border:1px solid var(--line);background:repeating-linear-gradient(45deg,var(--surface),var(--surface) 5px,var(--felt) 5px,var(--felt) 10px);display:grid;place-content:center;justify-items:center;gap:2px;padding:0;width:100%}
+.deck b{font:400 18px var(--display);letter-spacing:.1em}
+.deck small{font-size:11px;color:var(--muted)}
+.deck.sel{box-shadow:0 0 0 3px var(--accent)}
+.noble{aspect-ratio:1;border-radius:6px;border:1px solid color-mix(in srgb,var(--accent) 60%,var(--line));background:var(--card);display:grid;grid-template-columns:auto 1fr;align-items:center;gap:4px;padding:5px;min-width:0}
+.noble b{font:400 20px/1 var(--display)}
+.noble .rq{display:grid;gap:2px;justify-items:end}
+.noble .bon{width:17px;height:19px;font-size:11px}
+.noble.sm{width:54px;aspect-ratio:auto;padding:3px 4px;display:inline-grid}
+.noble.sm b{font-size:14px}.noble.sm .bon{width:14px;height:15px;font-size:10px}
+button.noble{width:96px}
+
+.bank{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.tok{position:relative;width:52px;height:52px;border-radius:50%;background:var(--gc);color:var(--gt);border:2px solid color-mix(in srgb,var(--ink) 35%,transparent);font:600 19px var(--body);font-variant-numeric:tabular-nums;padding:0}
+.tok:disabled{opacity:.5}
+.tok.g5:disabled{opacity:1}
+.tok.sel{box-shadow:0 0 0 3px var(--accent)}
+.tok .n{position:absolute;top:-6px;right:-6px;background:var(--accent);color:var(--accent-ink);border-radius:10px;font:600 11px/18px var(--body);min-width:18px;height:18px}
+
+.act{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:8px}
+.actrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:38px}
+.actrow .msg{flex:1 1 200px;min-width:0}
+.flag{background:var(--warn);color:var(--accent-ink);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;padding:2px 7px}
+.coach{border-top:1px dashed var(--line);padding-top:8px;font-size:14px}
+.coach b{color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:11px;margin-right:6px}
+.pp.me .resv .card.sm{width:64px}
+.pp.me .inv{max-width:330px}
+
+.side{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:none;padding:10px;font-weight:600;border-bottom:3px solid transparent;color:var(--muted)}
+.tabs button.on{border-bottom-color:var(--accent);color:var(--ink)}
+.pane{padding:10px 12px;max-height:74vh;overflow:auto}
+.rt{padding:8px 0 12px;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.rt:last-child{border-bottom:0}
+.rt h3{margin:0;font:600 14px var(--body);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.rt h3 span{font-weight:400;color:var(--muted);font-size:12px}
+.lab{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.cl{display:flex;flex-wrap:wrap;gap:7px;align-items:center;min-height:22px}
+.nrow{display:flex;flex-wrap:wrap;gap:6px}
+.nst{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:5px;padding:2px 5px;font-size:12px}
+.nst.rdy{border-color:var(--good);color:var(--good);font-weight:600}
+.logl{list-style:none;margin:0;padding:0;font-size:13px;display:grid;gap:3px}
+.logl li{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.logl .r{color:var(--muted);font-variant-numeric:tabular-nums;min-width:26px}
+.mc{display:inline-block;background:var(--gc);color:var(--gt);border:1px solid color-mix(in srgb,var(--ink) 30%,transparent);border-radius:3px;font-size:11px;font-weight:600;padding:0 5px;line-height:17px;white-space:nowrap}
+
+.ov{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 55%,transparent);display:grid;place-items:center;padding:16px;z-index:10;overflow:auto}
+.dlg{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:18px;width:min(100%,460px);display:grid;gap:12px;max-height:100%;overflow:auto}
+.dlg.wide{width:min(100%,760px)}
+.dlg h2{font:400 22px var(--display);margin:0;text-wrap:balance}
+.dlg h3{font:600 12px var(--body);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:6px 0 0}
+.fld{display:grid;gap:4px}
+.fld input,.fld select{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:8px;min-height:40px;width:100%}
+.seats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.drow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.dcol{display:grid;gap:6px;justify-items:center}
+.dcol .btn{min-width:40px;padding:4px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:nth-child(-n+2),td:nth-child(-n+2){text-align:left}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+tr.you td{font-weight:600}
+.chart text{font:11px var(--body);fill:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+.foot{font-size:12px;color:var(--muted)}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.plan{display:grid;gap:2px;text-align:left;align-content:start}
+.plan span{font-size:12px;color:var(--muted)}
+.plan:not(.on){opacity:.6}
+.dlg textarea{width:100%;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:8px;font:12px/1.4 ui-monospace,Consolas,monospace;resize:vertical}
+.bm{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:baseline}
+.bm b{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.06em}.bm.yo b{color:var(--warn)}
+.rvd .chip.hint{outline:2px dashed var(--accent);outline-offset:2px}.rvd .chip.mine{outline:2px solid var(--warn);outline-offset:2px}
+.card.mine{outline:3px solid var(--warn);outline-offset:2px}
+.bd{font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;border:1px solid var(--line);white-space:nowrap}
+.bd.best{color:var(--good);border-color:var(--good)}.bd.good{color:var(--muted)}.bd.inacc{color:var(--accent);border-color:var(--accent)}
+.bd.mistake{color:var(--warn);border-color:var(--warn)}.bd.blunder{background:var(--warn);border-color:var(--warn);color:var(--accent-ink)}
+.rvd{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:8px;background:var(--felt)}
+.rvl{display:grid;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.rv{display:grid;grid-template-columns:26px minmax(0,1.1fr) auto minmax(0,1.1fr) 40px;gap:8px;align-items:center;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:7px 8px;font-size:13px}
+.rv.on{background:var(--felt);box-shadow:inset 3px 0 0 var(--accent)}
+.rv .r{color:var(--muted)}.rv .ls{text-align:right;font-variant-numeric:tabular-nums;color:var(--warn)}
+.dres{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:5px;background:var(--felt)}.dres.ok{border-color:var(--good)}
+.bar{display:block;height:10px;background:var(--accent);border-radius:2px}
+td small{color:var(--muted)}
+@media (max-width:520px){.tok{width:44px;height:44px;font-size:19px}.market{padding:8px}.row{gap:5px}.seats{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:no-preference){.card,.tok{transition:transform .12s,box-shadow .12s}}
+</style>
+
+<header class="top">
+  <h1>Splendor Practice Engine</h1>
+  <div class="tools" id="tools"></div>
+</header>
+<main class="layout">
+  <section class="table">
+    <div class="opps" id="opps"></div>
+    <div class="market" id="market"></div>
+    <div class="bank" id="bank"></div>
+    <div class="act" id="act"></div>
+    <div id="mine"></div>
+  </section>
+  <aside class="side">
+    <div class="tabs" id="tabs"></div>
+    <div class="pane" id="pane"></div>
+  </aside>
+</main>
+<div id="modal"></div>
+
+<script>
+'use strict';
+/* ===================== DATA: official base set ===================== */
+// Each card: bonus colour, points, cost as digits in the order white, blue, green, red, black.
+const RAW=[
+ ['k011110','k012110','k022010','k000131','k000210','k020200','k000300','k104000',
+  'u010111','u010121','u010220','u001310','u010002','u000202','u000003','u100040',
+  'w001111','w001211','w002201','w031001','w000021','w002002','w003000','w100400',
+  'g011011','g011012','g001022','g013100','g021000','g002020','g000030','g100004',
+  'r011101','r021101','r020102','r010013','r002100','r020020','r030000','r140000'],
+ ['k132200','k130302','k201420','k200530','k250000','k300006',
+  'u102230','u102303','u253000','u220014','u205000','u306000',
+  'w100322','w123030','w200142','w200053','w200050','w360000',
+  'g130230','g123002','g242001','g205300','g200500','g300600',
+  'r120023','r103023','r214200','r230005','r200005','r300060'],
+ ['k333530','k400070','k400363','k500073',
+  'u330335','u470000','u463003','u573000',
+  'w303353','w400007','w430036','w530007',
+  'g353033','g407000','g436300','g507300',
+  'r335303','r400700','r403630','r500730']];
+const CI={w:0,u:1,g:2,r:3,k:4};
+const CARDS=[];
+RAW.forEach((lv,l)=>lv.forEach(s=>CARDS.push({id:CARDS.length,l,b:CI[s[0]],p:+s[1],c:[...s.slice(2)].map(Number)})));
+const NOBLES=['40004','00044','04400','44000','00440','30033','00333','33003','03330','33300'].map(s=>[...s].map(Number));
+
+/* ===================== ENGINE ===================== */
+const sum=a=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i];return s};
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function newGame(players){ // players: [{name,type,human}] already in seat order
+  const decks=[0,1,2].map(l=>shuffle(CARDS.filter(c=>c.l===l).map(c=>c.id)));
+  const board=decks.map(d=>[0,1,2,3].map(()=>d.pop()));
+  return {gid:Date.now(),bank:[7,7,7,7,7,5],decks,board,nobles:shuffle([0,1,2,3,4,5,6,7,8,9]).slice(0,5),
+    players:players.map(p=>({name:p.name,type:p.type,human:!!p.human,tok:[0,0,0,0,0,0],bon:[0,0,0,0,0],pts:0,cards:[],res:[],nobles:[],hist:[],t15:null})),
+    cur:0,round:1,final:false,over:false,log:[],sim:false};
+}
+function clone(S){return{bank:S.bank.slice(),decks:S.decks,board:S.board.map(r=>r.slice()),nobles:S.nobles.slice(),
+  players:S.players.map(p=>({name:p.name,type:p.type,human:p.human,tok:p.tok.slice(),bon:p.bon.slice(),pts:p.pts,cards:p.cards.slice(),res:p.res.map(r=>({id:r.id,hid:r.hid})),nobles:p.nobles.slice(),hist:p.hist,t15:p.t15})),
+  cur:S.cur,round:S.round,final:S.final,over:S.over,log:S.log,sim:true}}
+
+function payment(p,card){const pay=[0,0,0,0,0];let gold=0;
+  for(let c=0;c<5;c++){const need=Math.max(0,card.c[c]-p.bon[c]),use=Math.min(need,p.tok[c]);pay[c]=use;gold+=need-use}
+  return{pay,gold:Math.min(gold,p.tok[5]),ok:gold<=p.tok[5],short:Math.max(0,gold-p.tok[5])}}
+function qualifies(p,n){const rq=NOBLES[n];for(let c=0;c<5;c++)if(p.bon[c]<rq[c])return false;return true}
+// Cards a player could act on: the 12 face-up cards plus their reserve (hidden ones only if `own`).
+function vis(S,pid,own){const a=[];
+  for(let l=0;l<3;l++)for(let i=0;i<4;i++){const id=S.board[l][i];if(id!=null)a.push({id,l,i})}
+  S.players[pid].res.forEach((r,j)=>{if(own||!r.hid)a.push({id:r.id,r:j})});return a}
+
+function legalMoves(S,pid,noDeck){const p=S.players[pid],M=[];
+  for(const x of vis(S,pid,true))if(payment(p,CARDS[x.id]).ok)M.push({t:'buy',...x});
+  const av=[];for(let c=0;c<5;c++)if(S.bank[c]>0)av.push(c);
+  if(av.length>=3){for(let a=0;a<av.length;a++)for(let b=a+1;b<av.length;b++)for(let d=b+1;d<av.length;d++)M.push({t:'take',g:[av[a],av[b],av[d]]})}
+  else if(av.length)M.push({t:'take',g:av.slice()});
+  for(let c=0;c<5;c++)if(S.bank[c]>=4)M.push({t:'take',g:[c,c]});
+  if(p.res.length<3){
+    for(let l=0;l<3;l++)for(let i=0;i<4;i++){const id=S.board[l][i];if(id!=null)M.push({t:'res',l,i,id})}
+    if(!noDeck)for(let l=0;l<3;l++)if(S.decks[l].length)M.push({t:'res',l,deck:true});
+  }
+  if(!M.length)M.push({t:'pass'});
+  return M}
+
+function refill(S,l,i){S.board[l][i]=(!S.sim&&S.decks[l].length)?S.decks[l].pop():null}
+function applyMove(S,pid,m){const p=S.players[pid],e={r:S.round,pid,t:m.t};
+  const pre=(!S.sim&&p.human)?S.board.map(r=>r.slice()):null;
+  if(m.t==='take'){for(const c of m.g){S.bank[c]--;p.tok[c]++}e.g=m.g}
+  else if(m.t==='res'){let id;
+    if(m.deck){const d=S.decks[m.l];id=S.sim?d[d.length-1]:d.pop();p.res.push({id,hid:true});e.deck=m.l}
+    else{id=S.board[m.l][m.i];p.res.push({id,hid:false});refill(S,m.l,m.i)}
+    e.id=id;if(S.bank[5]>0){S.bank[5]--;p.tok[5]++;e.gold=1}}
+  else if(m.t==='buy'){const card=CARDS[m.id],pm=payment(p,card);
+    for(let c=0;c<5;c++){p.tok[c]-=pm.pay[c];S.bank[c]+=pm.pay[c]}
+    p.tok[5]-=pm.gold;S.bank[5]+=pm.gold;
+    if(m.r!=null)p.res.splice(m.r,1);else refill(S,m.l,m.i);
+    p.cards.push(m.id);p.bon[card.b]++;p.pts+=card.p;e.id=m.id}
+  const tot=sum(p.tok);
+  if(tot>10){const d=m.d||autoDiscard(S,pid,tot-10);for(let c=0;c<6;c++){p.tok[c]-=d[c];S.bank[c]+=d[c]}if(sum(d))e.d=d}
+  const q=S.nobles.filter(n=>qualifies(p,n));
+  if(q.length){const n=(m.n!=null&&q.includes(m.n))?m.n:q[0];S.nobles.splice(S.nobles.indexOf(n),1);p.nobles.push(n);p.pts+=3;e.n=n}
+  if(!S.sim){e.pts=p.pts;e.tok=p.tok.slice();e.bon=p.bon.slice();e.nc=p.cards.length;if(pre)e.board=pre;p.hist.push(p.pts);if(p.pts>=15&&p.t15==null)p.t15=p.hist.length;S.log.push(e)}
+  if(p.pts>=15)S.final=true;
+  S.cur=(pid+1)%4;
+  if(S.cur===0){if(S.final||S.round>=150)S.over=true;else S.round++}
+  return e}
+
+/* ===================== VALUATION (shared by Hard bot, coach, Read the table) ===================== */
+function stage(S){let mx=0;for(const p of S.players)if(p.pts>mx)mx=p.pts;return Math.max(.25,1-mx/15)}
+function nobleGain(S,p,b){let v=0;
+  for(const n of S.nobles){const rq=NOBLES[n];if(p.bon[b]<rq[b]){let m=0;for(let c=0;c<5;c++)m+=Math.max(0,rq[c]-p.bon[c]);v+=300/(m*m)}}
+  return v}
+// Turns until the card is bought, counting the buying turn itself (1 = affordable now).
+function turnsToBuy(S,p,card){let sf=0,mx=0,blocked=0,eff=0;
+  for(let c=0;c<5;c++){const need=Math.max(0,card.c[c]-p.bon[c]);eff+=need;const s=Math.max(0,need-p.tok[c]);sf+=s;if(s>mx)mx=s;if(s>S.bank[c])blocked++}
+  sf=Math.max(0,sf-p.tok[5]);if(sf===0)return 1;mx=Math.min(mx,sf);
+  return 1+Math.max(Math.ceil(sf/3),Math.ceil(mx/2))+blocked+(eff>10?2:0)}
+function targets(S,pid,own){const p=S.players[pid],st=stage(S),V=vis(S,pid,own),dem=[0,0,0,0,0];
+  for(const x of V){const cd=CARDS[x.id];if(cd.p>1)for(let c=0;c<5;c++)if(cd.c[c]>p.bon[c])dem[c]+=cd.p*W.dem}
+  const out=V.map(x=>{const cd=CARDS[x.id],val=cd.p*100+W.bon*Math.pow(st,W.stPow)+W.bon0+nobleGain(S,p,cd.b)+dem[cd.b],tn=turnsToBuy(S,p,cd);
+    return{id:x.id,l:x.l,i:x.i,r:x.r,val,tn,sc:val*W.hold*Math.pow(W.decay,tn-1)*(x.r!=null?W.resMul:1)}});
+  return out.sort((a,b)=>b.sc-a.sc)}
+function maxNext(S,pid,own){const p=S.players[pid];let gain=0,best=null;
+  for(const x of vis(S,pid,own)){const cd=CARDS[x.id];if(!payment(p,cd).ok)continue;
+    const g=cd.p+(nobleGain(S,p,cd.b)>=300?3:0);if(g>gain||!best){gain=g;best=x}}
+  return{gain,x:best}}
+function t15est(S,pid,own){const p=S.players[pid],need=15-p.pts;if(need<=0)return 0;
+  const A=[];for(const x of vis(S,pid,own)){const cd=CARDS[x.id],g=cd.p+(nobleGain(S,p,cd.b)>=300?3:0);if(g>0)A.push({g,tn:turnsToBuy(S,p,cd)})}
+  let best=99;
+  for(let i=0;i<A.length;i++){if(A[i].g>=need)best=Math.min(best,A[i].tn);
+    for(let j=i+1;j<A.length;j++)if(A[i].g+A[j].g>=need)best=Math.min(best,A[i].tn+A[j].tn)}
+  return Math.min(best,2+Math.ceil(need/1.5),9)}
+const W={stPow:1,discPen:40,resPen:20,resMul:1.1,bon:65,bon0:8,tok:4,gold:7,hold:.6,decay:.75,dem:5,nob:400,opp:.12,oppLate:.5,race:120};
+function evalState(S,me){const p=S.players[me];
+  if(S.final){let v=p.pts*1000-p.cards.length*5+(p.pts>=15?5000:0);
+    if(!S.over)for(let q=S.cur;q>0&&q<4;q++){if(q===me)continue;const mn=maxNext(S,q,false);if(S.players[q].pts+mn.gain>=Math.max(15,p.pts))v-=3000}
+    return v}
+  const st=stage(S);let v=p.pts*100+sum(p.bon)*(W.bon*Math.pow(st,W.stPow)+W.bon0)+p.tok[5]*W.gold;
+  for(let c=0;c<5;c++)v+=p.tok[c]*W.tok;
+  v-=W.resPen*p.res.length; // a reserved card that is not bought yet costs a slot and a turn
+  for(const n of S.nobles){const rq=NOBLES[n];let m=0;for(let c=0;c<5;c++)m+=Math.max(0,rq[c]-p.bon[c]);v+=W.nob/((m+1)*(m+1))}
+  const T=targets(S,me,true);v+=(T[0]?T[0].sc:0)+(T[1]?T[1].sc*.35:0)+(T[2]?T[2].sc*.15:0);
+  if(p.pts+maxNext(S,me,true).gain>=15)v+=1500;
+  const myT=t15est(S,me,true);let oT=9;
+  for(let q=0;q<4;q++){if(q===me)continue;const o=S.players[q];
+    if(o.pts+maxNext(S,q,false).gain>=15){v-=2500;oT=1;continue}
+    const ot=targets(S,q,false)[0];if(ot)v-=(W.opp+W.oppLate*(o.pts/15)*(o.pts/15))*ot.sc;
+    oT=Math.min(oT,t15est(S,q,false))}
+  if(Math.min(myT,oT)<=3)v+=W.race*(oT-myT);
+  return v}
+function autoDiscard(S,pid,n){const p=S.players[pid],use=[0,0,0,0,0];
+  for(const x of targets(S,pid,true).slice(0,3)){const cd=CARDS[x.id];for(let c=0;c<5;c++)use[c]=Math.max(use[c],cd.c[c]-p.bon[c])}
+  const d=[0,0,0,0,0,0],tk=p.tok.slice();
+  while(n-->0){let b=-1,bv=-99;for(let c=0;c<5;c++)if(tk[c]>0&&tk[c]-use[c]>bv){bv=tk[c]-use[c];b=c}if(b<0)b=5;tk[b]--;d[b]++}
+  return d}
+
+/* ===================== BOTS ===================== */
+function bestTake(p,takes,tg){let best=takes[0],bs=-1;
+  for(const m of takes){let s=m.g.length*.05+Math.random()*.01;const cnt=[0,0,0,0,0];for(const c of m.g)cnt[c]++;
+    tg.forEach((x,k)=>{if(!x)return;const cd=CARDS[x.id],w=k?.4:1;for(let c=0;c<5;c++)if(cnt[c])s+=w*Math.min(cnt[c],Math.max(0,cd.c[c]-p.bon[c]-p.tok[c]))});
+    if(s>bs){bs=s;best=m}}
+  return best}
+function botEasy(S,pid){const M=legalMoves(S,pid,true),p=S.players[pid];
+  const buys=M.filter(m=>m.t==='buy');
+  if(buys.length){const mx=Math.max(...buys.map(m=>CARDS[m.id].p));return pick(buys.filter(m=>CARDS[m.id].p===mx))}
+  const takes=M.filter(m=>m.t==='take');
+  if(takes.length){let best=null,bs=99;for(const x of vis(S,pid,true)){const s=payment(p,CARDS[x.id]).short+Math.random()*.5;if(s<bs){bs=s;best=x}}
+    return bestTake(p,takes,[best])}
+  return pick(M)}
+function botMedium(S,pid){const p=S.players[pid],M=legalMoves(S,pid,true);if(M[0].t==='pass')return M[0];
+  const w=[0,0,0,0,0];
+  const nb=S.nobles.map(n=>{const rq=NOBLES[n];let m=0;for(let c=0;c<5;c++)m+=Math.max(0,rq[c]-p.bon[c]);return{rq,m}}).sort((a,b)=>a.m-b.m).slice(0,2);
+  for(const n of nb)for(let c=0;c<5;c++)if(n.rq[c]>p.bon[c])w[c]+=1.5;
+  for(let c=0;c<5;c++)w[c]+=Math.min(p.bon[c],3)*.4;
+  const tot=sum(p.tok),late=p.pts>=10?1.5:1,eng=Math.max(0,2.5-p.cards.length*.3);
+  const V=vis(S,pid,true).map(x=>{const cd=CARDS[x.id],pm=payment(p,cd);let eff=0;for(let c=0;c<5;c++)eff+=Math.max(0,cd.c[c]-p.bon[c]);
+    return{...x,cd,short:pm.short,ok:pm.ok,s:cd.p*2.2*late+w[cd.b]+eng-eff*.3}});
+  if(!V.length)return M[0];
+  V.sort((a,b)=>(b.s-b.short*1.3)-(a.s-a.short*1.3));
+  const tg=V[0],buyOf=x=>M.find(m=>m.t==='buy'&&m.id===x.id);
+  if(tg.ok)return buyOf(tg);
+  const aff=V.filter(x=>x.ok).sort((a,b)=>b.s-a.s)[0];
+  if(aff&&(aff.s>=tg.s-2||tot>=8||aff.cd.p>0))return buyOf(aff);
+  const takes=M.filter(m=>m.t==='take');
+  if(takes.length&&tot<=7)return bestTake(p,takes,[tg,V[1]]);
+  const rs=M.find(m=>m.t==='res'&&m.id===tg.id);if(rs&&tg.cd.l>0)return rs;
+  if(takes.length)return bestTake(p,takes,[tg,V[1]]);
+  return aff?buyOf(aff):M[0]}
+function predictBuy(S,q){const mn=maxNext(S,q,false);if(!mn.x)return null;
+  let best=null,bv=-1;const p=S.players[q];
+  for(const x of vis(S,q,false)){const cd=CARDS[x.id];if(!payment(p,cd).ok)continue;const v=cd.p*100+nobleGain(S,p,cd.b)+10;if(v>bv){bv=v;best=x}}
+  return best?{t:'buy',...best}:null}
+// Hard: score every legal move, then look one more of its own turns ahead on the best few,
+// after letting each opponent make the purchase it is most likely to make.
+// Facts behind "why this card": points, gems still missing, noble progress, how many big cards its bonus discounts.
+function whyCard(S,pid,id){const p=S.players[pid],cd=CARDS[id],w={p:cd.p,col:cd.b,short:payment(p,cd).short,nm:0,dem:0,held:p.res.some(r=>r.id===id)};
+  for(const n of S.nobles){const rq=NOBLES[n];if(p.bon[cd.b]<rq[cd.b]){let m=0;for(let c=0;c<5;c++)m+=Math.max(0,rq[c]-p.bon[c]);if(!w.nm||m<w.nm)w.nm=m}}
+  for(const x of vis(S,pid,true)){const c2=CARDS[x.id];if(x.id!==id&&c2.p>1&&c2.c[cd.b]>p.bon[cd.b])w.dem++}
+  return w}
+function sameMove(a,b){if(a.t!==b.t)return false;if(a.t==='pass')return true;
+  if(a.t==='take')return a.g.slice().sort().join()===b.g.slice().sort().join();
+  return a.deck?!!b.deck&&a.l===b.l:!b.deck&&a.id===b.id}
+// Scores the best few legal moves, best first. `extra` (a move actually played) is always scored too and flagged .mine.
+function scoreMoves(S,pid,extra){const M=legalMoves(S,pid,true);
+  let ex=extra?M.find(m=>!extra.d&&sameMove(m,extra)):null;if(extra&&!ex){ex=extra;M.push(ex)}
+  const sc=M.map(m=>{const c=clone(S),e=applyMove(c,pid,m);return{m,c,v:evalState(c,pid)-(e.d?W.discPen*sum(e.d):0)}}).sort((a,b)=>b.v-a.v);
+  const top=sc.slice(0,6);if(ex){const x=sc.find(x=>x.m===ex);x.mine=true;if(!top.includes(x))top.push(x)}
+  for(const x of top){const c0=x.c;
+    if(c0.final){x.f=x.v+1e5;continue}
+    const c=clone(c0);
+    for(let k=1;k<4;k++){const q=(pid+k)%4,pb=predictBuy(c,q);if(pb)applyMove(c,q,pb);else c.cur=(q+1)%4}
+    if(c.final){x.f=x.v-1e5;continue}
+    let best=-1e9;
+    for(const m2 of legalMoves(c,pid,true)){if(m2.t==='res')continue;const c2=clone(c);applyMove(c2,pid,m2);
+      const v=c2.players[pid].pts>=15?5e4+c2.players[pid].pts*100:evalState(c2,pid);if(v>best)best=v}
+    x.f=.35*x.v+.65*best}
+  return top.sort((a,b)=>b.f-a.f)}
+function botHard(S,pid,explain){const M=legalMoves(S,pid,true);
+  if(M.length===1)return explain?{m:M[0],info:{k:'only'}}:M[0];
+  const bx=scoreMoves(S,pid)[0];if(!explain)return bx.m;
+  const m=bx.m,me=bx.c.players[pid],info={k:m.t};
+  if(m.t==='buy'){info.pts=me.pts;info.gain=me.pts-S.players[pid].pts;info.noble=me.nobles.length>S.players[pid].nobles.length;info.win=me.pts>=15;info.col=CARDS[m.id].b}
+  else if(m.t==='res'){info.why='target';
+    for(let q=0;q<4;q++){if(q===pid)continue;const mn=maxNext(S,q,false);
+      if(mn.x&&mn.x.id===m.id&&mn.gain>0){info.why='deny';info.opp=q;info.gain=mn.gain;break}
+      const ot=targets(S,q,false)[0];if(ot&&ot.id===m.id&&ot.tn<=2&&CARDS[m.id].p>=2){info.why='denySoon';info.opp=q}}}
+  else if(m.t==='take'){const TT=targets(bx.c,pid,true),tg=TT[0];if(tg){info.target=tg.id;info.tn=tg.tn;info.tw=whyCard(bx.c,pid,tg.id);
+    const p0=S.players[pid],cd=CARDS[tg.id],used=[0,0,0,0,0];info.spare=[];
+    for(const c of m.g){if(cd.c[c]-p0.bon[c]-p0.tok[c]-used[c]>0){used[c]++;continue}
+      const alt=TT.slice(1,4).find(x=>CARDS[x.id].c[c]>p0.bon[c]+p0.tok[c]);info.spare.push({c,id:alt?alt.id:null})}}}
+  if(m.t==='res'&&info.why==='target')info.tw=whyCard(bx.c,pid,m.id);
+  const e0=applyMove(clone(S),pid,m);if(e0.d)info.disc=e0.d;
+  return{m,info}}
+// Engine builder: the Hard bot's search, with weights that favour bonuses and nobles over reserving big cards.
+const ENGINE_W={bon:200,stPow:2.5,nob:900,resPen:80,hold:.5,dem:3}; // bonuses matter a lot early and little late
+function withW(o,f){const old={};for(const k in o){old[k]=W[k];W[k]=o[k]}try{return f()}finally{Object.assign(W,old)}}
+function chooseMove(S,pid){const ty=S.players[pid].type;if(ty.startsWith('plan:'))return planBot(S,pid,PLANS[ty.slice(5)]);if(ty==='engine')return withW(ENGINE_W,()=>botHard(S,pid));return ty==='easy'?botEasy(S,pid):ty==='medium'?botMedium(S,pid):botHard(S,pid)}
+
+/* ===================== STRATEGY PLANS + SIMULATOR ===================== */
+// Every plan uses the same tactics (same buy / take / reserve skeleton); only the priorities differ,
+// so the simulator compares plans rather than bot skill.
+const PLANS={
+  engine:{wp:1.4,wb:3,wn:.6,wc:.4,sh:1.4,engN:9},
+  rush:{wp:3.2,wb:.4,wn:.2,wc:.12,sh:.6,engN:4,resv:true},
+  nobles:{wp:1.6,wb:1,wn:2.4,wc:.3,sh:1.2,engN:7},
+  mid:{wp:2.6,wb:1.2,wn:.4,wc:.3,sh:1.1,engN:6,maxL:1},
+  focus:{wp:2,wb:1,wn:.4,wc:.3,sh:1.1,engN:7,wf:2.5},
+  balanced:{wp:2.2,wb:2.5,wn:1.5,wc:.3,sh:1.3,engN:8}};
+function planBot(S,pid,P){const p=S.players[pid],M=legalMoves(S,pid,true);if(M[0].t==='pass')return M[0];
+  const nw=[0,0,0,0,0],foc=[0,0,0,0,0];
+  const nb=S.nobles.map(n=>{const rq=NOBLES[n];let m=0;for(let c=0;c<5;c++)m+=Math.max(0,rq[c]-p.bon[c]);return{rq,m}}).sort((a,b)=>a.m-b.m).slice(0,2);
+  for(const n of nb)for(let c=0;c<5;c++)if(n.rq[c]>p.bon[c])nw[c]+=1;
+  if(P.wf){const d=p.bon.map(b=>b*2);for(const x of vis(S,pid,true)){const cd=CARDS[x.id];if(cd.p>=3)for(let c=0;c<5;c++)d[c]+=cd.c[c]}
+    [0,1,2,3,4].sort((a,b)=>d[b]-d[a]).slice(0,2).forEach(c=>foc[c]=1)}
+  const tot=sum(p.tok),late=p.pts>=10?1.5:1,eng=Math.max(0,1-p.cards.length/P.engN);
+  let V=vis(S,pid,true);if(P.maxL!=null){const f=V.filter(x=>CARDS[x.id].l<=P.maxL);if(f.length)V=f}
+  V=V.map(x=>{const cd=CARDS[x.id],pm=payment(p,cd);let eff=0;for(let c=0;c<5;c++)eff+=Math.max(0,cd.c[c]-p.bon[c]);
+    return{...x,cd,short:pm.short,ok:pm.ok,s:cd.p*P.wp*late+P.wb*eng+P.wn*nw[cd.b]+(foc[cd.b]?P.wf:0)-eff*P.wc}});
+  if(!V.length)return M[0];
+  V.sort((a,b)=>(b.s-b.short*P.sh)-(a.s-a.short*P.sh));
+  const tg=V[0],buyOf=x=>M.find(m=>m.t==='buy'&&m.id===x.id);
+  if(tg.ok)return buyOf(tg);
+  const rs=M.find(m=>m.t==='res'&&m.id===tg.id);
+  if(P.resv&&rs&&tg.cd.p>=3&&tg.short>=3)return rs;
+  const aff=V.filter(x=>x.ok).sort((a,b)=>b.s-a.s)[0];
+  if(aff&&(aff.s>=tg.s-2||tot>=8||aff.cd.p>0))return buyOf(aff);
+  const takes=M.filter(m=>m.t==='take');
+  if(takes.length&&tot<=7)return bestTake(p,takes,[tg,V[1]]);
+  if(rs&&tg.cd.l>0)return rs;
+  if(takes.length)return bestTake(p,takes,[tg,V[1]]);
+  return aff?buyOf(aff):M[0]}
+// Plays n four-player games; each game seats four of the given plans at random. Adds to acc and returns it.
+function simPlans(keys,n,acc){acc=acc||{};for(const k of keys)acc[k]=acc[k]||{g:0,w:0,pts:0,rank:0,t15:0,cards:0,nob:0};
+  for(let i=0;i<n;i++){let pool=shuffle(keys.slice());while(pool.length<4)pool=pool.concat(shuffle(keys.slice()));
+    const seats=shuffle(pool.slice(0,4)),S=newGame(seats.map(k=>({name:k,type:'plan:'+k})));
+    while(!S.over)applyMove(S,S.cur,chooseMove(S,S.cur));
+    [0,1,2,3].sort((a,b)=>S.players[b].pts-S.players[a].pts||S.players[a].cards.length-S.players[b].cards.length).forEach((pid,pos)=>{
+      const p=S.players[pid],a=acc[seats[pid]];a.g++;a.pts+=p.pts;a.rank+=pos+1;a.cards+=p.cards.length;a.nob+=p.nobles.length;if(!pos){a.w++;a.t15+=p.t15||S.round}})}
+  return acc}
+
+function dataCheck(){const e=[];
+  [40,30,20].forEach((n,l)=>{const a=CARDS.filter(c=>c.l===l);if(a.length!==n)e.push('level '+(l+1)+' count '+a.length);
+    for(let b=0;b<5;b++)if(a.filter(c=>c.b===b).length!==n/5)e.push('level '+(l+1)+' colour '+b)});
+  if(NOBLES.length!==10)e.push('nobles');return e}
+
+if(typeof module!=='undefined')module.exports={ENGINE_W,scoreMoves,sameMove,PLANS,simPlans,CARDS,NOBLES,W,newGame,applyMove,chooseMove,legalMoves,botHard,dataCheck,clone,sum};
+
+/* ===================== UI ===================== */
+if(typeof document!=='undefined'){
+const TXT={
+en:{newGame:'New game',undo:'Undo turn',hint:'Show best move',coach:'Coach',read:'Read the table',log:'Log',fast:'Fast bots',normal:'Normal bots',slow:'Slow bots',
+ easy:'Easy',medium:'Medium',engine:'Engine',hard:'Hard',setup:'New practice game',yourName:'Your name',bot:'Bot {0}',start:'Start game',seatNote:'Seat order is drawn at random each game.',
+ yourTurn:'Your turn. Pick gems from the bank or tap a card.',thinking:'{0} is playing…',take:'Take gems',buy:'Buy',reserve:'Reserve',clear:'Clear',pass:'Pass',
+ noMoves:'You have no legal move this turn.',twoHint:'Tap the same gem again to take 2 (the pile needs 4 or more).',short:'{0} gem(s) short',resFull:'You already hold 3 reserved cards.',
+ blind:'Reserve the top card of the level {0} deck without seeing it.',paying:'Pays',free:'free',
+ discardT:'Discard {0} token(s)',discardH:'You can hold 10 tokens at most. Choose what goes back to the bank.',confirm:'Confirm',nobleT:'Two nobles qualify. Choose one.',
+ finalRound:'Final round',over:'Game over.',summary:'Show summary',canBuy:'Can buy next turn',nothing:'Nothing',near:'1–2 gems short',nobles:'Nobles',ready:'ready',
+ estT:'about {0} turn(s) to 15',pt:'pts',tokens:'tokens',cards:'cards',noLog:'No moves yet.',
+ lTake:'takes',lBuy:'buys',lRes:'reserves',lResHid:'reserves a hidden level {0} card',lPass:'passes',lDisc:'discards',lNoble:'noble visits, +3',
+ wins:'{0} wins',rank:'#',player:'Player',points:'Points',noblesN:'Nobles',turns:'Turns',t15:'Turns to 15',ppt:'Pts/turn',chart:'Points by turn',teamT:'Practice history on this device',
+ games:'Games',winsN:'Wins',avgPpt:'Avg pts/turn',bestT15:'Best turns to 15',avgT15:'Avg turns to 15',fullLog:'Turn-by-turn log',close:'Close',turn:'turn',
+ cOnly:'Only one legal move.',cBuyWin:'Buy this card. It takes you to {0} points and triggers the end of the game.',cBuy:'Buy this card for +{0} point(s) and a permanent {1} bonus.',cBuy0:'Buy this card for its permanent {1} bonus. It makes your next cards cheaper.',
+ cNoble:' A noble visits too (+3).',cDeny:'Reserve this card. {0} can buy it next turn for {1} point(s).',cDenySoon:'Reserve this card. It is the best target for {0}, and you can use it yourself.',
+ cTarget:'Reserve this card as your next target and take a gold.',cTake:'Take these gems. They are for the card with the dotted outline, which you can buy in about {0} turns:',cTake1:'Take these gems. Next turn you can buy the card with the dotted outline:',wWhy:'Why this card',wSpare:'Spare gem',cSpare:'{0} is not needed for the target. Taking three different colours gives you a third gem for free, so the coach picks one that helps {1}.',cSpare0:'{0} is not needed for any card yet. Taking three different colours gives you a third gem for free, and a spare gem still counts toward later cards.',wDisc:'Coach would discard',useSug:'Use this',cDisc:'You can hold only 10 tokens, so one has to go back. This is the gem your target cards need least.',wPts:'worth {0} point(s)',wShort:'{0} more gem(s) needed after this move',wPay:'you can pay for it now',wNoble1:'its {0} bonus brings a noble (+3)',wNoble:'its {0} bonus counts toward a noble ({1} bonuses to go)',wDem:'its {0} bonus makes {1} bigger cards cheaper',wHeld:'it is in your reserve, so nobody can take it',cTakeP:'Take these gems to keep your options open.',
+ review:'Review my moves',revT:'Game review',revNone:'No moves to review yet.',revNote:'Each of your moves is compared with the move the Hard bot would have played. The bot looks 1–2 turns ahead and is not always right, so use the grades to find turns worth a second look.',revPos:'Position before your move in round {0}',revMove:'Move',revCost:'Cost (about points)',revBest:'bot\'s best',revYou:'(you played)',revLegend:'Dashed outline: the bot\'s best move. Dotted outline: the card those gems are for. Solid outline: what you played.',revBestL:'Best move',revYouL:'You played',revSame:'You played the best move.',bankL:'bank',deckL:'from deck',bonusL:'bonuses',reservedL:'reserved',rv_best:'Best',rv_good:'Good',rv_inacc:'Inaccuracy',rv_mistake:'Mistake',rv_blunder:'Blunder',copyLog:'Copy log',copy:'Copy to clipboard',copied:'Copied. Paste it into a chat or document.',copyH:'Full game record as plain text, with the market and the coach\'s suggestion at each of your turns. If the button does not copy, select the text and copy it yourself.',sim:'Simulator',simT:'Strategy simulator',simIntro:'Pick the plans to compare. Each game seats four of them at random, and every plan uses the same tactics, so only the priorities differ. With four seats, 25% wins is break-even.',
+ simRun:'Run simulation',simGames:'{0} games',simRes:'Results after {0} games',simBest:'Best plan so far: {0}, winning {1}% of its games.',simNeed:'Choose at least two plans.',simNote:'These are bot results. They show which priorities work on average, not what a strong human should do in every position.',
+ plan:'Plan',winPct:'Win %',avgRank:'Avg place',avgPts:'Avg points',winTurn:'Turns to win',avgCards:'Cards',
+ pn_engine:'Engine first',pd_engine:'Buys cheap level I cards for bonuses until about 9 cards, then turns to points.',
+ pn_rush:'Point rush',pd_rush:'Reserves high-point cards early and collects gems to buy them directly. Few cheap cards.',
+ pn_nobles:'Noble hunt',pd_nobles:'Buys the colours that the two nearest nobles need.',
+ pn_mid:'Level II only',pd_mid:'Ignores level III and wins with level I and II cards.',
+ pn_focus:'Two-colour focus',pd_focus:'Concentrates on the two colours the big cards cost most.',
+ pn_balanced:'Balanced',pd_balanced:'Mixes engine, nobles and points. Close to the Medium bot.',
+ colors:['white','blue','green','red','black','gold'],lang:'ไทย'},
+th:{newGame:'เกมใหม่',undo:'ย้อนหนึ่งตา',hint:'แสดงตาที่ดีที่สุด',coach:'โค้ช',read:'อ่านโต๊ะ',log:'บันทึก',fast:'บอทเร็ว',normal:'บอทปกติ',slow:'บอทช้า',
+ easy:'ง่าย',medium:'กลาง',engine:'สายเครื่องจักร',hard:'ยาก',setup:'เริ่มเกมฝึกซ้อม',yourName:'ชื่อของคุณ',bot:'บอท {0}',start:'เริ่มเกม',seatNote:'ลำดับที่นั่งสุ่มใหม่ทุกเกม',
+ yourTurn:'ตาของคุณ เลือกอัญมณีจากกองกลางหรือแตะการ์ด',thinking:'{0} กำลังเล่น…',take:'หยิบอัญมณี',buy:'ซื้อ',reserve:'จอง',clear:'ล้าง',pass:'ผ่าน',
+ noMoves:'ตานี้คุณไม่มีตาเดินที่ทำได้',twoHint:'แตะสีเดิมอีกครั้งเพื่อหยิบ 2 เม็ด (กองต้องมี 4 เม็ดขึ้นไป)',short:'ขาดอีก {0} เม็ด',resFull:'คุณจองครบ 3 ใบแล้ว',
+ blind:'จองการ์ดใบบนสุดของกองระดับ {0} โดยไม่เห็นหน้าการ์ด',paying:'จ่าย',free:'ฟรี',
+ discardT:'ทิ้งโทเคน {0} เม็ด',discardH:'ถือโทเคนได้ไม่เกิน 10 เม็ด เลือกเม็ดที่จะคืนกองกลาง',confirm:'ยืนยัน',nobleT:'ขุนนางเข้าเงื่อนไขสองใบ เลือกหนึ่งใบ',
+ finalRound:'รอบสุดท้าย',over:'จบเกมแล้ว',summary:'ดูสรุป',canBuy:'ซื้อได้ในตาถัดไป',nothing:'ไม่มี',near:'ขาดอีก 1–2 เม็ด',nobles:'ขุนนาง',ready:'ครบแล้ว',
+ estT:'อีกประมาณ {0} ตาถึง 15',pt:'แต้ม',tokens:'โทเคน',cards:'การ์ด',noLog:'ยังไม่มีการเดิน',
+ lTake:'หยิบ',lBuy:'ซื้อ',lRes:'จอง',lResHid:'จองการ์ดคว่ำระดับ {0}',lPass:'ผ่าน',lDisc:'ทิ้ง',lNoble:'ขุนนางมาเยือน +3',
+ wins:'{0} ชนะ',rank:'#',player:'ผู้เล่น',points:'แต้ม',noblesN:'ขุนนาง',turns:'จำนวนตา',t15:'ตาที่ถึง 15',ppt:'แต้ม/ตา',chart:'แต้มในแต่ละตา',teamT:'ประวัติการฝึกบนเครื่องนี้',
+ games:'เกม',winsN:'ชนะ',avgPpt:'แต้ม/ตา เฉลี่ย',bestT15:'ถึง 15 เร็วสุด',avgT15:'ถึง 15 เฉลี่ย',fullLog:'บันทึกทุกตา',close:'ปิด',turn:'ตา',
+ cOnly:'มีตาเดินที่ทำได้เพียงแบบเดียว',cBuyWin:'ซื้อการ์ดใบนี้ คุณจะมี {0} แต้มและเริ่มรอบจบเกม',cBuy:'ซื้อการ์ดใบนี้ ได้ +{0} แต้ม และโบนัสสี{1}ถาวร',cBuy0:'ซื้อการ์ดใบนี้เพื่อโบนัสสี{1}ถาวร การ์ดใบต่อไปจะถูกลง',
+ cNoble:' และขุนนางมาเยือนด้วย (+3)',cDeny:'จองการ์ดใบนี้ {0} ซื้อได้ในตาถัดไปและจะได้ {1} แต้ม',cDenySoon:'จองการ์ดใบนี้ เป็นเป้าหมายหลักของ {0} และคุณใช้เองได้ด้วย',
+ cTarget:'จองการ์ดใบนี้เป็นเป้าหมายถัดไปและรับทอง 1 เม็ด',cTake:'หยิบอัญมณีชุดนี้ เพื่อการ์ดที่มีกรอบเส้นจุด ซึ่งจะซื้อได้ในอีกประมาณ {0} ตา:',cTake1:'หยิบอัญมณีชุดนี้ ตาถัดไปคุณซื้อการ์ดที่มีกรอบเส้นจุดได้:',wWhy:'ทำไมต้องใบนี้',wSpare:'เม็ดสำรอง',cSpare:'{0} ไม่ได้ใช้กับการ์ดเป้าหมาย การหยิบ 3 สีไม่ซ้ำได้เม็ดที่สามฟรี โค้ชจึงเลือกสีที่ช่วยการ์ด {1}',cSpare0:'{0} ยังไม่มีการ์ดใบไหนต้องใช้ แต่การหยิบ 3 สีไม่ซ้ำได้เม็ดที่สามฟรี และเม็ดสำรองยังใช้กับการ์ดใบต่อ ๆ ไปได้',wDisc:'โค้ชจะทิ้ง',useSug:'ใช้ตามนี้',cDisc:'ถือโทเคนได้แค่ 10 เม็ด จึงต้องคืนกองกลาง เม็ดนี้คือสีที่การ์ดเป้าหมายของคุณต้องใช้น้อยที่สุด',wPts:'ได้ {0} แต้ม',wShort:'หลังตานี้ยังขาดอีก {0} เม็ด',wPay:'จ่ายได้เลยตอนนี้',wNoble1:'โบนัสสี{0}ทำให้ได้ขุนนาง (+3)',wNoble:'โบนัสสี{0}นับเข้าเงื่อนไขขุนนาง (ขาดอีก {1} โบนัส)',wDem:'โบนัสสี{0}ทำให้การ์ดใบใหญ่ {1} ใบถูกลง',wHeld:'อยู่ในมือที่จองไว้ ไม่มีใครแย่งได้',cTakeP:'หยิบอัญมณีชุดนี้เพื่อเปิดทางเลือกไว้',
+ review:'ทบทวนการเดินของฉัน',revT:'ทบทวนเกม',revNone:'ยังไม่มีตาให้ทบทวน',revNote:'เทียบการเดินแต่ละตาของคุณกับตาที่บอทระดับยากจะเดิน บอทมองล่วงหน้าแค่ 1–2 ตาและไม่ได้ถูกเสมอ ใช้ผลนี้เพื่อหาตาที่ควรกลับมาคิดอีกครั้ง',revPos:'สถานการณ์ก่อนคุณเดินในรอบ {0}',revMove:'ตาเดิน',revCost:'เสียไป (ประมาณแต้ม)',revBest:'ดีที่สุดของบอท',revYou:'(คุณเดิน)',revLegend:'กรอบเส้นประ: ตาที่ดีที่สุดของบอท กรอบเส้นจุด: การ์ดเป้าหมายของอัญมณีชุดนั้น กรอบเส้นทึบ: ตาที่คุณเดิน',revBestL:'ตาที่ดีที่สุด',revYouL:'คุณเดิน',revSame:'คุณเดินตาที่ดีที่สุดแล้ว',bankL:'กองกลาง',deckL:'จากกอง',bonusL:'โบนัส',reservedL:'จองไว้',rv_best:'ดีที่สุด',rv_good:'ดี',rv_inacc:'ไม่แม่น',rv_mistake:'พลาด',rv_blunder:'พลาดหนัก',copyLog:'คัดลอกบันทึก',copy:'คัดลอก',copied:'คัดลอกแล้ว นำไปวางในแชตหรือเอกสารได้เลย',copyH:'บันทึกทั้งเกมแบบข้อความ พร้อมการ์ดบนโต๊ะและคำแนะนำของโค้ชในแต่ละตาของคุณ ถ้าปุ่มคัดลอกไม่ทำงาน ให้เลือกข้อความแล้วคัดลอกเอง',sim:'จำลองแผน',simT:'ตัวจำลองแผนการเล่น',simIntro:'เลือกแผนที่ต้องการเปรียบเทียบ แต่ละเกมสุ่มแผน 4 แผนมานั่งโต๊ะ ทุกแผนใช้วิธีเดินพื้นฐานเดียวกัน ต่างกันแค่ลำดับความสำคัญ โต๊ะ 4 คน ชนะ 25% ถือว่าเท่าทุน',
+ simRun:'เริ่มจำลอง',simGames:'{0} เกม',simRes:'ผลหลังจาก {0} เกม',simBest:'แผนที่ดีที่สุดตอนนี้: {0} ชนะ {1}% ของเกมที่ลงเล่น',simNeed:'เลือกอย่างน้อยสองแผน',simNote:'นี่คือผลจากบอท บอกได้ว่าลำดับความสำคัญแบบไหนได้ผลโดยเฉลี่ย ไม่ได้บอกว่าผู้เล่นเก่ง ๆ ควรเดินอย่างไรในทุกสถานการณ์',
+ plan:'แผน',winPct:'ชนะ %',avgRank:'อันดับเฉลี่ย',avgPts:'แต้มเฉลี่ย',winTurn:'จำนวนตาที่ชนะ',avgCards:'การ์ด',
+ pn_engine:'สร้างเครื่องจักรก่อน',pd_engine:'ซื้อการ์ดระดับ I ราคาถูกเพื่อเก็บโบนัสจนมีราว 9 ใบ แล้วค่อยเก็บแต้ม',
+ pn_rush:'บุกเก็บแต้ม',pd_rush:'จองการ์ดแต้มสูงตั้งแต่ต้นเกม แล้วสะสมอัญมณีซื้อโดยตรง ซื้อการ์ดถูกน้อยมาก',
+ pn_nobles:'ล่าขุนนาง',pd_nobles:'ซื้อสีที่ขุนนางสองใบที่ใกล้ที่สุดต้องการ',
+ pn_mid:'เน้นระดับ II',pd_mid:'ไม่สนใจระดับ III ชนะด้วยการ์ดระดับ I และ II',
+ pn_focus:'โฟกัสสองสี',pd_focus:'เน้นสองสีที่การ์ดใบใหญ่ต้องใช้มากที่สุด',
+ pn_balanced:'สมดุล',pd_balanced:'ผสมเครื่องจักร ขุนนาง และแต้ม ใกล้เคียงบอทระดับกลาง',
+ colors:['ขาว','น้ำเงิน','เขียว','แดง','ดำ','ทอง'],lang:'EN'}};
+const store={get(k,d){try{const v=localStorage.getItem('spe.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('spe.'+k,JSON.stringify(v))}catch(e){}}};
+let lang=store.get('lang',(navigator.language||'').startsWith('th')?'th':'en');
+const t=(k,...a)=>{let s=TXT[lang][k]??TXT.en[k]??k;if(typeof s==='string')a.forEach((v,i)=>s=s.replace('{'+i+'}',v));return s};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ROM=['I','II','III'];
+
+let S=null,undo=[],timer=null,modal=null,started=false;
+const ui={quiz:null,dfb:'',dres:null,drill:0,g:[],card:null,hint:null,tab:store.get('tab','read'),coach:store.get('coach',true),speed:store.get('speed',700)};
+const meId=()=>S.players.findIndex(p=>p.human);
+const myTurn=()=>S&&!S.over&&S.players[S.cur].human&&!timer;
+
+/* ---------- pieces ---------- */
+const dot=c=>`<i class="chip dot g${c}"></i>`;
+const mini=id=>{const c=CARDS[id];return `<span class="mc g${c.b}">${ROM[c.l]}${c.p?' · '+c.p:''}</span>`};
+function cardHTML(id,o={}){const c=CARDS[id],tag=o.a?'button':'span';
+  return `<${tag} class="card g${c.b} ${o.cls||''}" ${o.a?`data-a="${o.a}" data-v="${o.v}"`:''} aria-label="${ROM[c.l]} ${t('colors')[c.b]} ${c.p}">`+
+    `<span class="chd"><span class="cp">${c.p||''}</span><i class="gem"></i></span>`+
+    `<span class="cost">${c.c.map((n,k)=>n?`<i class="chip g${k}">${n}</i>`:'').join('')}</span><span class="lv">${ROM[c.l]}</span></${tag}>`}
+function nobleHTML(n,o={}){const tag=o.a?'button':'span';
+  return `<${tag} class="noble ${o.cls||''}" ${o.a?`data-a="${o.a}" data-v="${n}"`:''}><b>3</b><span class="rq">${NOBLES[n].map((q,c)=>q?`<i class="bon g${c}">${q}</i>`:'').join('')}</span></${tag}>`}
+function logText(e){const p=S.players[e.pid];let s;
+  if(e.t==='take')s=t('lTake')+' '+e.g.map(dot).join('');
+  else if(e.t==='buy')s=t('lBuy')+' '+mini(e.id);
+  else if(e.t==='res')s=(e.deck!=null&&!p.human?t('lResHid',e.deck+1):t('lRes')+' '+mini(e.id))+(e.gold?' +'+dot(5):'');
+  else s=t('lPass');
+  if(e.d)s+=' · '+t('lDisc')+' '+e.d.map((n,c)=>dot(c).repeat(n)).join('');
+  if(e.n!=null)s+=' · '+t('lNoble');
+  return s}
+
+/* ---------- render ---------- */
+function render(){if(!S){rTools();return}
+  rTools();const me=meId(),mine=myTurn()&&!ui.quiz,P=S.players[me],h=ui.hint;
+  $('opps').innerHTML=[1,2,3].map(k=>panel((me+k)%4)).join('');
+  let m=`<div class="row">${S.nobles.map(n=>nobleHTML(n)).join('')}</div>`;
+  for(let l=2;l>=0;l--){
+    const ds=ui.card&&ui.card.deck&&ui.card.l===l;
+    m+=`<div class="row"><button class="deck ${ds?'sel':''}" data-a="deck" data-v="${l}" ${S.decks[l].length&&mine?'':'disabled'} aria-label="deck ${ROM[l]}"><b>${ROM[l]}</b><small>${S.decks[l].length}</small></button>`;
+    for(let i=0;i<4;i++){const id=S.board[l][i];
+      if(id==null){m+='<span class="card empty"></span>';continue}
+      const cls=[(ui.card&&ui.card.id===id&&!ui.card.deck)?'sel':'',payment(P,CARDS[id]).ok?'can':'',h&&h.m.id===id&&h.m.t!=='take'?'hint':'',h&&h.info.target===id?'hint2':''].join(' ');
+      m+=cardHTML(id,{a:'card',v:l+','+i,cls})}
+    m+='</div>'}
+  $('market').innerHTML=m;
+  $('bank').innerHTML=[0,1,2,3,4,5].map(c=>{const n=ui.g.filter(x=>x===c).length,hi=h&&h.m.t==='take'&&h.m.g.includes(c);
+    return `<button class="tok g${c} ${n?'sel':''} ${hi?'hint':''}" data-a="tok" data-v="${c}" ${c===5||!mine||(!S.bank[c]&&!n)?'disabled':''} aria-label="${t('colors')[c]} ${S.bank[c]}">${S.bank[c]}${n?`<span class="n">${n}</span>`:''}</button>`}).join('');
+  $('act').innerHTML=actBar();
+  $('mine').innerHTML=panel(me);
+  $('tabs').innerHTML=['read','log'].map(x=>`<button class="${ui.tab===x?'on':''}" data-a="tab" data-v="${x}">${t(x)}</button>`).join('');
+  $('pane').innerHTML=ui.tab==='read'?readPane():logPane(40);
+}
+function rTools(){const idle=S&&(myTurn()||S.over);
+  $('tools').innerHTML=`<button class="btn" data-a="new">${t('newGame')}</button>`+
+    `<button class="btn" data-a="undo" ${idle&&(S.over?undo.length>0:undo.length>1)?'':'disabled'}>${t('undo')}</button>`+
+    `<button class="btn" data-a="hint" ${S&&myTurn()&&!S.drill?'':'disabled'}>${t('hint')}</button>`+
+    `<button class="btn ${ui.coach?'on':''}" data-a="coach" aria-pressed="${ui.coach}">${t('coach')}: ${ui.coach?'ON':'OFF'}</button>`+
+    `<select class="btn" id="speed" aria-label="speed">${[[250,'fast'],[700,'normal'],[1400,'slow']].map(([v,k])=>`<option value="${v}" ${ui.speed==v?'selected':''}>${t(k)}</option>`).join('')}</select>`+
+    `<button class="btn" data-a="sim">${t('sim')}</button><button class="btn" data-a="lang">${t('lang')}</button>`}
+function panel(pid){const p=S.players[pid],isMe=p.human,mine=myTurn(),h=ui.hint;let last=null;
+  for(let i=S.log.length-1;i>=0;i--)if(S.log[i].pid===pid){last=S.log[i];break}
+  const res=p.res.map((r,j)=>{
+    if(isMe)return cardHTML(r.id,{a:'resc',v:j,cls:'sm '+(ui.card&&ui.card.r===j?'sel ':'')+(payment(p,CARDS[r.id]).ok?'can ':'')+(h&&h.m.r===j?'hint ':'')+(h&&h.info.target===r.id?'hint2':'')});
+    return r.hid?`<span class="back">${ROM[CARDS[r.id].l]}</span>`:cardHTML(r.id,{cls:'sm'})}).join('');
+  return `<div class="pp ${S.cur===pid&&!S.over?'cur':''} ${isMe?'me':''}">
+    <div class="pph"><span class="seat">${pid+1}</span><b class="nm">${esc(p.name)}</b>${isMe?'':`<span class="lvl">${t(p.type)}</span>`}<span class="pts">${p.pts}<small>${t('pt')}</small></span></div>
+    <div class="inv">${[0,1,2,3,4,5].map(c=>`<span class="slot"><i class="bon g${c} ${c===5?'none':p.bon[c]?'':'zero'}">${c<5?p.bon[c]:''}</i><i class="chip g${c} ${p.tok[c]?'':'zero'}">${p.tok[c]}</i></span>`).join('')}</div>
+    <div class="meta"><span>${t('tokens')} ${sum(p.tok)}/10</span><span>${t('cards')} ${p.cards.length}</span>${p.nobles.map(n=>nobleHTML(n,{cls:'sm'})).join('')}</div>
+    <div class="resv">${res}</div>
+    ${isMe?'':`<div class="last">${last?logText(last):''}</div>`}</div>`}
+function actBar(){const me=meId(),P=S.players[me];let row;
+  const flag=S.final&&!S.over?`<span class="flag">${t('finalRound')}</span>`:'';
+  if(S.over)row=`<span class="msg">${t('over')}</span><button class="btn pri" data-a="summary">${t('summary')}</button>`;
+  else if(!myTurn())row=`${flag}<span class="msg">${t('thinking',esc(S.players[S.cur].name))}</span>`;
+  else if(ui.quiz)row=quizRow();
+  else if(ui.g.length){const one=ui.g.length===1&&S.bank[ui.g[0]]>=4;
+    row=`${flag}<span class="msg">${ui.g.map(c=>`<i class="chip g${c}"></i>`).join(' ')} ${one?`<small>${t('twoHint')}</small>`:''}</span><button class="btn pri" data-a="take">${t('take')}</button><button class="btn" data-a="clear">${t('clear')}</button>`}
+  else if(ui.card){const c=ui.card;
+    if(c.deck)row=`${flag}<span class="msg">${t('blind',c.l+1)}${P.res.length>=3?' '+t('resFull'):''}</span><button class="btn pri" data-a="reserve" ${P.res.length<3?'':'disabled'}>${t('reserve')}</button><button class="btn" data-a="clear">${t('clear')}</button>`;
+    else{const pm=payment(P,CARDS[c.id]),paid=pm.pay.map((n,k)=>`<i class="chip g${k}">${n}</i>`.repeat(n?1:0)).join('')+(pm.gold?`<i class="chip g5">${pm.gold}</i>`:'');
+      const msg=pm.ok?`${t('paying')}: ${paid||t('free')}`:t('short',pm.short);
+      row=`${flag}<span class="msg">${mini(c.id)} ${msg}${c.r==null&&P.res.length>=3?' · '+t('resFull'):''}</span><button class="btn pri" data-a="buy" ${pm.ok?'':'disabled'}>${t('buy')}</button>`+
+        (c.r==null?`<button class="btn" data-a="reserve" ${P.res.length<3?'':'disabled'}>${t('reserve')}</button>`:'')+`<button class="btn" data-a="clear">${t('clear')}</button>`}}
+  else{const M=legalMoves(S,me);row=M[0].t==='pass'?`${flag}<span class="msg">${t('noMoves')}</span><button class="btn pri" data-a="pass">${t('pass')}</button>`:`${flag}<span class="msg">${t('yourTurn')}</span>`}
+  return `<div class="actrow">${row}</div>`+(ui.hint&&myTurn()?`<div class="coach"><b>${t('coach')}</b>${hintText(ui.hint)}</div>`:'')+drillStrip()}
+function hintText(h){const i=h.info,C=t('colors');
+  if(i.k==='only'||i.k==='pass')return t('cOnly');
+  if(i.k==='buy')return (i.win?t('cBuyWin',i.pts):CARDS[h.m.id].p?t('cBuy',CARDS[h.m.id].p,C[i.col]):t('cBuy0',0,C[i.col]))+(i.noble?t('cNoble'):'');
+  if(i.k==='res')return (i.why==='deny'?t('cDeny',esc(S.players[i.opp].name),i.gain):i.why==='denySoon'?t('cDenySoon',esc(S.players[i.opp].name)):t('cTarget'))+' '+mini(h.m.id)+whyText(i.tw)+discText(i);
+  const gems=h.m.g.map(dot).join('')+' ';
+  return gems+(i.target==null?t('cTakeP'):(i.tn<=1?t('cTake1'):t('cTake',i.tn))+' '+mini(i.target))+spareText(i)+whyText(i.tw)+discText(i)}
+function spareText(i){if(!i.spare||!i.spare.length)return '';
+  return `<span class="cw"><b>${t('wSpare')}</b>${i.spare.map(x=>x.id!=null?t('cSpare',dot(x.c),mini(x.id)):t('cSpare0',dot(x.c))).join(' ')}</span>`}
+function whyText(w){if(!w)return '';const C=t('colors'),a=[];
+  if(w.p)a.push(t('wPts',w.p));
+  a.push(w.short?t('wShort',w.short):t('wPay'));
+  if(w.nm===1)a.push(t('wNoble1',C[w.col]));else if(w.nm&&w.nm<=4)a.push(t('wNoble',C[w.col],w.nm));
+  if(w.dem>=2)a.push(t('wDem',C[w.col],w.dem));
+  if(w.held)a.push(t('wHeld'));
+  return `<span class="cw"><b>${t('wWhy')}</b>${a.join(' · ')}</span>`}
+function discText(i){return i.disc?`<span class="cw"><b>${t('wDisc')}</b>${i.disc.map((n,c)=>dot(c).repeat(n)).join('')} ${t('cDisc')}</span>`:''}
+function readPane(){const me=meId();if(!S.over&&(S.drill===4||S.drill===5))return `<p class="foot">${t('dHide')}</p>`;
+  return [1,2,3].map(k=>{const q=(me+k)%4,p=S.players[q];
+    const V=vis(S,q,false).map(x=>({id:x.id,pm:payment(p,CARDS[x.id])}));
+    const can=V.filter(x=>x.pm.ok).sort((a,b)=>CARDS[b.id].p-CARDS[a.id].p),near=V.filter(x=>!x.pm.ok&&x.pm.short<=2).sort((a,b)=>a.pm.short-b.pm.short||CARDS[b.id].p-CARDS[a.id].p);
+    const nob=S.nobles.map(n=>{const rq=NOBLES[n],miss=rq.map((v,c)=>Math.max(0,v-p.bon[c])),m=sum(miss);
+      return `<span class="nst ${m?'':'rdy'}">${nobleHTML(n,{cls:'sm'})} ${m?miss.map((v,c)=>v?`<i class="bon g${c}" style="width:15px;height:17px;font-size:10px">${v}</i>`:'').join(''):t('ready')}</span>`}).join('');
+    return `<div class="rt"><h3>${esc(p.name)} <span>${p.pts} ${t('pt')} · ${t('estT',t15est(S,q,false))}</span></h3>
+      <div class="lab">${t('canBuy')}</div><div class="cl">${can.map(x=>cardHTML(x.id,{cls:'sm'})).join('')||`<span class="foot">${t('nothing')}</span>`}</div>
+      <div class="lab">${t('near')}</div><div class="cl">${near.map(x=>`<span class="wrapc">${cardHTML(x.id,{cls:'sm'})}<span class="tag">−${x.pm.short}</span></span>`).join('')||`<span class="foot">${t('nothing')}</span>`}</div>
+      <div class="lab">${t('nobles')}</div><div class="nrow">${nob}</div></div>`}).join('')}
+function logPane(n){const L=n?S.log.slice(-n):S.log;if(!L.length)return `<p class="foot">${t('noLog')}</p>`;
+  return (n?`<p class="cl"><button class="btn" data-a="review">${t('review')}</button><button class="btn" data-a="copylog">${t('copyLog')}</button></p>`:'')+`<ul class="logl">${L.slice().reverse().map(e=>`<li><span class="r">${e.r}</span><b>${esc(S.players[e.pid].name)}</b><span>${logText(e)}</span></li>`).join('')}</ul>`}
+
+/* ---------- plain-text log for analysis (always English so it can be pasted anywhere) ---------- */
+const LET='WBGRK*';
+const lst=a=>a.map((n,k)=>n?LET[k]+n:'').filter(Boolean).join(' ');
+const cstr=id=>{const c=CARDS[id];return ROM[c.l]+'-'+LET[c.b]+c.p+'['+lst(c.c)+']'};
+const tstr=a=>a.map((n,k)=>LET[k]+n).join(' ');
+function mstr(m){return m.t==='take'?'TAKE '+m.g.map(c=>LET[c]).join(' '):m.t==='buy'?'BUY '+cstr(m.id):m.t==='res'?(m.deck?'RESERVE blind from deck '+ROM[m.l]:'RESERVE '+cstr(m.id)):'PASS'}
+function plainLog(){const P=S.players,L=['SPLENDOR PRACTICE LOG',
+  'Legend: W white, B blue, G green, R red, K black, * gold. Card = level-bonus+points[cost], e.g. II-R2[W3 K5] is a level II card with a red bonus, 2 points, costing 3 white and 5 black.',
+  'Each turn line ends with that player\'s position AFTER the move. Tokens are capped at 10.',
+  'Seats in turn order: '+P.map((p,i)=>(i+1)+'. '+p.name+' ('+(p.human?'human':p.type+' bot')+')').join(', '),
+  'Nobles (3 points each, need bonuses): '+[...S.nobles,...P.flatMap(p=>p.nobles)].sort((a,b)=>a-b).map(n=>'['+lst(NOBLES[n])+']').join(' '),''];
+  for(const e of S.log){const p=P[e.pid];
+    if(e.board)L.push('','  market before '+p.name+' moved: '+[2,1,0].map(l=>e.board[l].filter(x=>x!=null).map(cstr).join(' ')).join(' | '));
+    if(e.coach)L.push('  coach suggested: '+e.coach);
+    let a=e.t==='take'?'TAKE '+e.g.map(c=>LET[c]).join(' '):e.t==='buy'?'BUY '+cstr(e.id):e.t==='res'?(e.deck!=null&&!p.human?'RESERVE hidden card from deck '+ROM[e.deck]:'RESERVE '+cstr(e.id)+(e.deck!=null?' (blind)':''))+(e.gold?' +*1':''):'PASS';
+    if(e.d)a+=', DISCARD '+lst(e.d);
+    if(e.n!=null)a+=', NOBLE ['+lst(NOBLES[e.n])+'] +3';
+    L.push('R'+e.r+' '+p.name+': '+a+(e.tok?' || pts '+e.pts+', cards '+e.nc+', tokens '+tstr(e.tok)+', bonus '+tstr(e.bon):''))}
+  L.push('',S.over?'FINAL':'GAME IN PROGRESS (round '+S.round+')');
+  ranking().forEach((pid,k)=>{const p=P[pid];L.push((k+1)+'. '+p.name+': '+p.pts+' pts, '+p.cards.length+' cards, '+p.nobles.length+' nobles, turns to 15: '+(p.t15??'-')+', unbought reserves: '+(p.res.map(r=>p.human||!r.hid||S.over?cstr(r.id):'hidden').join(' ')||'none'))});
+  return L.join('\n')}
+function copyModal(){showModal(`<h2>${t('copyLog')}</h2><p class="foot" id="cpst">${t('copyH')}</p><textarea id="cptx" readonly rows="14">${esc(plainLog())}</textarea>
+  <div class="drow"><button class="btn pri" data-a="docopy">${t('copy')}</button><button class="btn" data-a="close">${t('close')}</button></div>`,true)}
+
+/* ---------- game review: grade each of the player's moves against the Hard bot's best move ---------- */
+function moveFromLog(S0,pid,e){let m=null;
+  if(e.t==='take')m={t:'take',g:e.g};
+  else if(e.t==='pass')m={t:'pass'};
+  else if(e.t==='res'&&e.deck!=null)m={t:'res',l:e.deck,deck:true};
+  else{const r=S0.players[pid].res.findIndex(x=>x.id===e.id);
+    if(e.t==='buy'&&r>=0)m={t:'buy',r,id:e.id};
+    else for(let l=0;l<3;l++){const i=S0.board[l].indexOf(e.id);if(i>=0)m={t:e.t,l,i,id:e.id}}}
+  if(m&&e.d)m.d=e.d;if(m&&e.n!=null)m.n=e.n;return m}
+let rev=null;
+function buildReview(){const me=meId(),H=S.log.filter(e=>e.pid===me),key=S.gid+':'+H.length;if(rev&&rev.key===key)return rev;
+  const rows=[];
+  H.forEach((e,k)=>{if(!undo[k])return;const S0=JSON.parse(undo[k]);if(S0.round!==e.r||S0.cur!==me)return;const mv=moveFromLog(S0,me,e);if(!mv)return;
+    const top=scoreMoves(S0,me,mv),mine=top.find(x=>x.mine),best=top[0],loss=Math.max(0,best.f-mine.f),same=mine===best||loss<1;
+    rows.push({r:e.r,S0,mv,best:best.m,loss,same,cls:same?'best':loss<15?'good':loss<50?'inacc':loss<150?'mistake':'blunder',
+      alts:top.slice(0,3).map(x=>({m:x.m,d:best.f-x.f,mine:x.mine})).concat(top.indexOf(mine)>2?[{m:mine.m,d:loss,mine:true}]:[])})});
+  return rev={key,rows}}
+function moveHTML(m){return m.t==='take'?t('lTake')+' '+m.g.map(dot).join(''):m.t==='buy'?t('lBuy')+' '+mini(m.id):m.t==='res'?t('lRes')+' '+(m.deck?t('deckL')+' '+ROM[m.l]:mini(m.id)):t('lPass')}
+const lossTxt=d=>d<5?'≈0':d>=1000?'−−':'−'+(d/100).toFixed(1);
+function reviewModal(sel){const rows=buildReview().rows;
+  if(!rows.length){showModal(`<h2>${t('revT')}</h2><p>${t('revNone')}</p><div class="drow"><button class="btn" data-a="close">${t('close')}</button></div>`);return}
+  if(sel==null){sel=0;rows.forEach((x,k)=>{if(x.loss>rows[sel].loss)sel=k})}
+  const x=rows[sel],P=x.S0.players[meId()],cnt={};rows.forEach(y=>cnt[y.cls]=(cnt[y.cls]||0)+1);
+  const h=botHard(x.S0,meId(),true),why=sameMove(h.m,x.best)?hintText(h):'',gm=(m,c)=>m.t==='take'&&m.g.includes(c);
+  const mark=id=>(x.best.id===id&&x.best.t!=='take'&&!x.best.deck?'hint ':'')+(why&&h.info.target===id?'hint2 ':'')+(!x.same&&x.mv.id===id&&x.mv.t!=='take'&&!x.mv.deck?'mine':'');
+  showModal(`<h2>${t('revT')}</h2>
+    <div class="cl">${['best','good','inacc','mistake','blunder'].map(c=>`<span class="bd ${c}">${t('rv_'+c)} ${cnt[c]||0}</span>`).join('')}</div>
+    <p class="foot">${t('revNote')}</p>
+    <div class="rvd"><div class="bm"><b>${t('revBestL')}</b><span>${why||moveHTML(x.best)}${why&&x.best.t==='buy'?' '+mini(x.best.id):''}</span></div>
+      ${x.same?`<div class="bm"><b></b><span class="foot">${t('revSame')}</span></div>`:`<div class="bm yo"><b>${t('revYouL')}</b><span>${moveHTML(x.mv)} <span class="bd ${x.cls}">${t('rv_'+x.cls)}</span> ${lossTxt(x.loss)}</span></div>`}
+      <div class="lab">${t('revPos',x.r)}</div>
+      ${[2,1,0].map(l=>`<div class="cl">${x.S0.board[l].map(id=>id==null?'':cardHTML(id,{cls:'sm '+mark(id)})).join('')}</div>`).join('')}
+      <div class="cl"><span class="lab">${t('bankL')}</span>${x.S0.bank.map((n,c)=>`<i class="chip g${c} ${gm(x.best,c)?'hint ':''}${!x.same&&gm(x.mv,c)?'mine':''}">${n}</i>`).join('')}</div>
+      <div class="cl"><span class="lab">${t('tokens')}</span>${P.tok.map((n,c)=>n?`<i class="chip g${c}">${n}</i>`:'').join('')||'–'}<span class="lab">${t('bonusL')}</span>${P.bon.map((n,c)=>n?`<i class="bon g${c}">${n}</i>`:'').join('')||'–'}${P.res.length?`<span class="lab">${t('reservedL')}</span>`+P.res.map(r=>cardHTML(r.id,{cls:'sm '+mark(r.id)})).join(''):''}</div>
+      <div class="tw"><table><tr><th>${t('revMove')}</th><th></th><th>${t('revCost')}</th></tr>${x.alts.map((a,i)=>`<tr class="${a.mine?'you':''}"><td>${moveHTML(a.m)}</td><td>${i===0?t('revBest'):''}${a.mine?' '+t('revYou'):''}</td><td>${lossTxt(a.d)}</td></tr>`).join('')}</table></div>
+      <p class="foot">${t('revLegend')}</p></div>
+    <div class="rvl">${rows.map((y,k)=>`<button class="rv ${k===sel?'on':''}" data-a="rsel" data-v="${k}"><span class="r">${y.r}</span><span>${moveHTML(y.mv)}</span><span class="bd ${y.cls}">${t('rv_'+y.cls)}</span><span>${y.same?'':'→ '+moveHTML(y.best)}</span><span class="ls">${y.same?'':lossTxt(y.loss)}</span></button>`).join('')}</div>
+    <div class="drow"><button class="btn" data-a="copylog">${t('copyLog')}</button>${S.over?`<button class="btn" data-a="summary">${t('summary')}</button>`:''}<button class="btn" data-a="close">${t('close')}</button></div>`,true)}
+
+const ACT_EXTRA={};
+/* ---------- drills: six guided exercises with their own table, questions and pass mark ---------- */
+Object.assign(TXT.en,{mode:'Mode',free:'Free play',drill:'Drill',dGoal:'To pass:',
+ dn1:'Buy when you can',dn2:'Name your target',dn3:'No discards, no dead reserves',dn4:'Read the table',dn5:'Count the endgame',dn6:'Fewer mistakes',
+ dd1:'3 Easy bots, coach off. Each turn, look for a card you can afford (green outline) before you take gems. The app counts every turn you took gems or reserved while a card was affordable.',
+ dg1:'reach 15 points within 28 of your turns, 3 games in a row.',
+ dd2:'3 Easy bots, coach off. Each time you take gems, the app asks which card they are for. Tap that card. It is a match if your card is one of the bot\'s top two targets after your move.',
+ dg2:'match on at least 70% of your takes, with 8 or more takes in the game.',
+ dd3:'3 Medium bots, coach off. Never go over 10 tokens, and reserve only a card you will really buy.',
+ dg3:'finish a game with at least 12 points, 0 tokens discarded and 0 reserved cards left in hand.',
+ dd4:'3 Medium bots, coach off, Read the table panel hidden. Every second round the app asks how many cards one opponent could buy on their next turn with what they hold now.',
+ dg4:'80% correct, with 10 or more questions answered.',
+ dd5:'3 Medium bots, coach off, Read the table panel hidden. Once anyone has 10 points, the app asks each turn who is closest to 15 by the bot\'s turn count.',
+ dg5:'win 2 of your last 3 games.',
+ dd6:'2 Medium bots and 1 Hard bot, coach off. Play your best game. At the end the review counts your Mistakes and Blunders.',
+ dg6:'3 or fewer Mistakes and Blunders in the game.',
+ d1s:'turn {0} · {1} pts · missed buys {2}',d1F:'You could have bought:',d1r:'Turns to 15: {0}. Missed buys: {1}.',
+ dQs:'correct {0} of {1}',dQr:'Correct: {0} of {1}.',d3s:'discarded {0} · reserved in hand {1}',d3r:'Discarded: {0}. Reserved cards left: {1}. Points: {2}.',
+ d5r:'You finished in place {0}.',d6s:'graded at the end of the game',d6r:'Mistakes and Blunders: {0}.',
+ dPass:'Passed.',dGameOk:'This game counts. Keep going.',dFail:'Not passed yet.',dStreak:'Streak: {0} of 3 games.',dLast3:'Wins in your last 3 games: {0} (2 needed).',dDone:'Drill completed.',dHide:'Hidden during this drill.',
+ q4T:'How many cards can {0} buy next turn?',q4H:'Count the face-up cards and their visible reserved cards. Use their tokens, gold and bonuses.',q4A:'{0} can buy {1}:',
+ q5T:'Who is closest to 15 points?',q2T:'Which card are these gems for? Tap it.',q2N:'No specific card',q2A:'Bot\'s target after your move:',qOk:'Correct.',qNo:'Not this time.',qCancel:'Back'});
+Object.assign(TXT.th,{mode:'โหมด',free:'เล่นอิสระ',drill:'แบบฝึก',dGoal:'เกณฑ์ผ่าน:',
+ dn1:'ซื้อได้ต้องซื้อ',dn2:'ตั้งเป้าก่อนหยิบ',dn3:'ไม่ทิ้ง ไม่จองค้าง',dn4:'อ่านโต๊ะ',dn5:'นับตาท้ายเกม',dn6:'ลดตาที่พลาด',
+ dd1:'บอทง่าย 3 ตัว ปิดโค้ช ทุกตาให้มองหาการ์ดที่จ่ายไหว (กรอบเขียว) ก่อนหยิบอัญมณี แอปจะนับทุกตาที่คุณหยิบอัญมณีหรือจองทั้งที่มีการ์ดซื้อได้',
+ dg1:'ถึง 15 แต้มภายใน 28 ตาของคุณ 3 เกมติดกัน',
+ dd2:'บอทง่าย 3 ตัว ปิดโค้ช ทุกครั้งที่หยิบอัญมณี แอปจะถามว่าหยิบเพื่อการ์ดใบไหน ให้แตะการ์ดใบนั้น นับว่าตรงถ้าเป็นหนึ่งในสองเป้าหมายอันดับแรกของบอทหลังตาเดินของคุณ',
+ dg2:'ตรงอย่างน้อย 70% ของการหยิบ และหยิบอย่างน้อย 8 ครั้งในเกม',
+ dd3:'บอทกลาง 3 ตัว ปิดโค้ช ห้ามถือเกิน 10 เม็ด และจองเฉพาะใบที่จะซื้อจริง',
+ dg3:'จบเกมด้วยอย่างน้อย 12 แต้ม ทิ้ง 0 เม็ด และไม่มีการ์ดจองค้างในมือ',
+ dd4:'บอทกลาง 3 ตัว ปิดโค้ช ซ่อนแผงอ่านโต๊ะ ทุกสองรอบแอปจะถามว่าคู่แข่งคนหนึ่งซื้อการ์ดได้กี่ใบในตาถัดไปด้วยของที่ถืออยู่ตอนนี้',
+ dg4:'ตอบถูก 80% และตอบอย่างน้อย 10 ข้อ',
+ dd5:'บอทกลาง 3 ตัว ปิดโค้ช ซ่อนแผงอ่านโต๊ะ เมื่อมีคนถึง 10 แต้ม แอปจะถามทุกตาว่าใครใกล้ 15 ที่สุดตามการนับของบอท',
+ dg5:'ชนะ 2 ใน 3 เกมล่าสุด',
+ dd6:'บอทกลาง 2 ตัว บอทยาก 1 ตัว ปิดโค้ช เล่นให้ดีที่สุด ตอนจบระบบทบทวนจะนับตาที่ "พลาด" และ "พลาดหนัก"',
+ dg6:'พลาดและพลาดหนักรวมไม่เกิน 3 ตาในเกม',
+ d1s:'ตาที่ {0} · {1} แต้ม · พลาดโอกาสซื้อ {2} ครั้ง',d1F:'ตานี้คุณซื้อได้:',d1r:'ถึง 15 ในตาที่: {0} พลาดโอกาสซื้อ: {1} ครั้ง',
+ dQs:'ถูก {0} จาก {1}',dQr:'ถูก {0} จาก {1} ข้อ',d3s:'ทิ้งไป {0} เม็ด · จองค้างในมือ {1} ใบ',d3r:'ทิ้ง {0} เม็ด การ์ดจองค้าง {1} ใบ ได้ {2} แต้ม',
+ d5r:'คุณจบอันดับ {0}',d6s:'ให้คะแนนตอนจบเกม',d6r:'พลาดและพลาดหนัก: {0} ตา',
+ dPass:'ผ่าน',dGameOk:'เกมนี้นับ เล่นต่อให้ครบเกณฑ์',dFail:'ยังไม่ผ่าน',dStreak:'ผ่านติดกัน {0} จาก 3 เกม',dLast3:'ชนะใน 3 เกมล่าสุด: {0} (ต้องการ 2)',dDone:'ผ่านแบบฝึกนี้แล้ว',dHide:'ซ่อนไว้ระหว่างแบบฝึกนี้',
+ q4T:'{0} ซื้อการ์ดได้กี่ใบในตาถัดไป?',q4H:'นับการ์ดหงายบนโต๊ะและการ์ดจองที่มองเห็นของเขา ใช้โทเคน ทอง และโบนัสของเขา',q4A:'{0} ซื้อได้ {1} ใบ:',
+ q5T:'ใครใกล้ 15 แต้มที่สุด?',q2T:'หยิบอัญมณีชุดนี้เพื่อการ์ดใบไหน? แตะการ์ดใบนั้น',q2N:'ไม่มีใบเจาะจง',q2A:'เป้าหมายของบอทหลังตาเดินของคุณ:',qOk:'ถูกต้อง',qNo:'ยังไม่ตรง',qCancel:'ย้อนกลับ'});
+const DRILLS={1:['easy','easy','easy'],2:['easy','easy','easy'],3:['medium','medium','medium'],4:['medium','medium','medium'],5:['medium','medium','medium'],6:['medium','medium','hard']};
+const streakOf=h=>{let s=0;for(let i=h.length-1;i>=0&&h[i];i--)s++;return s};
+function drillProg(name,n){const r=((store.get('drills',{})[name]||{})[n])||{hist:[]};return{passed:!!r.done,streak:streakOf(r.hist)}}
+function saveDrill(name,n,ok,gid){const all=store.get('drills',{}),u=all[name]||(all[name]={}),r=u[n]||(u[n]={hist:[]});
+  if(r.gid===gid)r.hist.pop();r.gid=gid;r.hist.push(ok?1:0);r.hist=r.hist.slice(-20);
+  const streak=streakOf(r.hist),last3=r.hist.slice(-3).filter(Boolean).length;
+  if(n===1?streak>=3:n===5?last3>=2:ok)r.done=true;
+  store.set('drills',all);return{streak,last3,done:!!r.done}}
+function myDiscards(){const me=meId();return S.log.filter(e=>e.pid===me&&e.d).reduce((s,e)=>s+sum(e.d),0)}
+function drillResult(){const n=S.drill,me=meId(),p=S.players[me],d=S.dst;let ok=false,text='';
+  if(n===1){ok=p.t15!=null&&p.t15<=28;text=t('d1r',p.t15??'–',d.missed)}
+  if(n===2){ok=d.asked>=8&&d.ok/d.asked>=.7;text=t('dQr',d.ok,d.asked)}
+  if(n===3){const dc=myDiscards();ok=dc===0&&p.res.length===0&&p.pts>=12;text=t('d3r',dc,p.res.length,p.pts)}
+  if(n===4){ok=d.asked>=10&&d.ok/d.asked>=.8;text=t('dQr',d.ok,d.asked)}
+  if(n===5){const pl=ranking().indexOf(me)+1;ok=pl===1;text=t('d5r',pl)+' '+t('dQr',d.ok,d.asked)}
+  if(n===6){const bad=buildReview().rows.filter(x=>x.cls==='mistake'||x.cls==='blunder').length;ok=bad<=3;text=t('d6r',bad)}
+  return{n,ok,text,sv:saveDrill(p.name,n,ok,S.gid)}}
+function drillResHTML(){const r=ui.dres;if(!r)return '';
+  const prog=r.sv.done?t('dDone'):r.n===1?t('dStreak',r.sv.streak):r.n===5?t('dLast3',r.sv.last3):'';
+  return `<div class="dres ${r.ok?'ok':''}"><b>${t('drill')} ${r.n}: ${t('dn'+r.n)}</b><span><span class="bd ${r.ok?'best':'mistake'}">${r.sv.done?t('dPass'):r.ok?t('dGameOk'):t('dFail')}</span> ${r.text}</span><span class="foot">${t('dGoal')} ${t('dg'+r.n)} ${prog}</span></div>`}
+function drillStrip(){if(!S.drill||S.over)return '';const n=S.drill,p=S.players[meId()],d=S.dst;
+  const s=n===1?t('d1s',p.hist.length+1,p.pts,d.missed):n===3?t('d3s',myDiscards(),p.res.length):n===6?t('d6s'):t('dQs',d.ok,d.asked);
+  return `<div class="coach"><b>${t('drill')} ${n}</b>${t('dn'+n)} · ${s}${ui.dfb?`<span class="cw">${ui.dfb}</span>`:''}</div>`}
+function startQuiz(){ui.quiz=null;
+  if(S.drill===4&&S.round>=2&&S.round%2===0)ui.quiz={type:4,opp:(meId()+1+(S.round/2)%3)%4};
+  else if(S.drill===5&&!S.final&&Math.max(...S.players.map(p=>p.pts))>=10)ui.quiz={type:5}}
+function quizRow(){const q=ui.quiz;
+  if(q.type===4)return `<span class="msg"><b>${t('q4T',esc(S.players[q.opp].name))}</b><br><small>${t('q4H')}</small></span>`+[0,1,2,3].map(v=>`<button class="btn" data-a="q4" data-v="${v}">${v===3?'3+':v}</button>`).join('');
+  if(q.type===5)return `<span class="msg"><b>${t('q5T')}</b></span>`+S.players.map((p,i)=>`<button class="btn" data-a="q5" data-v="${i}">${esc(p.name)}</button>`).join('');
+  return `<span class="msg">${q.m.g.map(c=>`<i class="chip g${c}"></i>`).join(' ')} <b>${t('q2T')}</b></span><button class="btn" data-a="q2none">${t('q2N')}</button><button class="btn" data-a="qcancel">${t('qCancel')}</button>`}
+function answer2(id){const m=ui.quiz.m,me=meId(),c=clone(S);applyMove(c,me,m);
+  const T=targets(c,me,true),ok=id!=null&&T.slice(0,2).some(x=>x.id===id);S.dst.asked++;if(ok)S.dst.ok++;
+  ui.dfb=(ok?t('qOk'):t('qNo'))+(T.length?' '+t('q2A')+' '+mini(T[0].id)+whyText(whyCard(c,me,T[0].id)):'');
+  ui.quiz=null;commit({...m,asked:true})}
+Object.assign(ACT_EXTRA,{
+  q4(v){const q=ui.quiz.opp,p=S.players[q],A=vis(S,q,false).filter(x=>payment(p,CARDS[x.id]).ok),ok=Math.min(A.length,3)===+v;S.dst.asked++;if(ok)S.dst.ok++;
+    ui.dfb=(ok?t('qOk'):t('qNo'))+' '+t('q4A',esc(p.name),A.length)+' '+A.map(x=>mini(x.id)).join(' ');ui.quiz=null;render()},
+  q5(v){const me=meId(),T=S.players.map((p,i)=>t15est(S,i,i===me)),ok=T[+v]===Math.min(...T);S.dst.asked++;if(ok)S.dst.ok++;
+    ui.dfb=(ok?t('qOk'):t('qNo'))+' '+S.players.map((p,i)=>esc(p.name)+' ≈'+T[i]).join(' · ');ui.quiz=null;render()},
+  q2none(){answer2(null)},qcancel(){ui.quiz=null;render()}});
+
+/* ---------- modals ---------- */
+const simSt={keys:Object.keys(PLANS),n:2000,acc:null,ran:[],done:0,run:false,open:false};
+function simModal(){const a=simSt.acc;let res='';
+  if(a&&simSt.done){const rows=simSt.ran.map(k=>({k,...a[k]})).filter(x=>x.g).sort((x,y)=>y.w/y.g-x.w/x.g),top=rows[0].w/rows[0].g||1;
+    res=`<h3>${t('simRes',simSt.done)}</h3><p>${t('simBest','<b>'+t('pn_'+rows[0].k)+'</b>',(rows[0].w/rows[0].g*100).toFixed(1))}</p>
+      <div class="tw"><table><tr><th>#</th><th>${t('plan')}</th><th>${t('winPct')}</th><th></th><th>${t('avgRank')}</th><th>${t('avgPts')}</th><th>${t('winTurn')}</th><th>${t('avgCards')}</th><th>${t('noblesN')}</th></tr>${rows.map((x,i)=>{const w=x.w/x.g,se=1.96*Math.sqrt(w*(1-w)/x.g)*100;
+        return `<tr><td>${i+1}</td><td>${t('pn_'+x.k)}</td><td>${(w*100).toFixed(1)} <small>±${se.toFixed(1)}</small></td><td style="min-width:90px"><span class="bar" style="width:${Math.max(2,w/top*100)}%"></span></td><td>${(x.rank/x.g).toFixed(2)}</td><td>${(x.pts/x.g).toFixed(1)}</td><td>${x.w?(x.t15/x.w).toFixed(1):'–'}</td><td>${(x.cards/x.g).toFixed(1)}</td><td>${(x.nob/x.g).toFixed(2)}</td></tr>`}).join('')}</table></div>
+      <p class="foot">${t('simNote')}</p>`}
+  showModal(`<h2>${t('simT')}</h2><p class="foot">${t('simIntro')}</p>
+    <div class="plans">${Object.keys(PLANS).map(k=>{const on=simSt.keys.includes(k);return `<button class="btn plan ${on?'on':''}" data-a="simtog" data-v="${k}" aria-pressed="${on}" ${simSt.run?'disabled':''}><b>${t('pn_'+k)}</b><span>${t('pd_'+k)}</span></button>`}).join('')}</div>
+    <div class="drow"><select class="btn" id="simn" aria-label="games" ${simSt.run?'disabled':''}>${[400,2000,8000].map(n=>`<option value="${n}" ${simSt.n===n?'selected':''}>${t('simGames',n)}</option>`).join('')}</select>
+      <button class="btn pri" data-a="simrun" ${simSt.run||simSt.keys.length<2?'disabled':''}>${simSt.run?simSt.done+' / '+simSt.n:t('simRun')}</button><button class="btn" data-a="close">${t('close')}</button></div>
+    ${simSt.keys.length<2?`<p class="foot">${t('simNeed')}</p>`:''}${res}`,true);simSt.open=true}
+function simStep(){if(!simSt.open){simSt.run=false;return}
+  simPlans(simSt.ran,100,simSt.acc);simSt.done+=100;if(simSt.done>=simSt.n)simSt.run=false;simModal();if(simSt.run)setTimeout(simStep,0)}
+function showModal(html,wide){simSt.open=false;modal=html;$('modal').innerHTML=`<div class="ov"><div class="dlg ${wide?'wide':''}" role="dialog" aria-modal="true">${html}</div></div>`}
+function closeModal(){simSt.open=false;modal=null;$('modal').innerHTML=''}
+function setupModal(){const dn=ui.drill||0,nm=store.get('name','')||'Player',lv=dn?DRILLS[dn]:store.get('levels',['easy','medium','hard']);
+  showModal(`<h2>${t('setup')}</h2>
+    <label class="fld"><span class="lab">${t('yourName')}</span><input id="pname" maxlength="16" value="${esc(store.get('name',''))}" autocomplete="off"></label>
+    <label class="fld"><span class="lab">${t('mode')}</span><select id="drill"><option value="0">${t('free')}</option>${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${dn===n?'selected':''}>${t('drill')} ${n}: ${t('dn'+n)}${drillProg(nm,n).passed?' ✓':''}</option>`).join('')}</select></label>
+    ${dn?`<div class="dres"><span>${t('dd'+dn)}</span><span><b>${t('dGoal')}</b> ${t('dg'+dn)}</span></div>`:''}
+    <div class="seats">${[0,1,2].map(i=>`<label class="fld"><span class="lab">${t('bot','ABC'[i])}</span><select id="lv${i}" ${dn?'disabled':''}>${['easy','medium','engine','hard'].map(x=>`<option value="${x}" ${lv[i]===x?'selected':''}>${t(x)}</option>`).join('')}</select></label>`).join('')}</div>
+    <p class="foot">${t('seatNote')}</p>
+    <div class="drow"><button class="btn pri" data-a="start">${t('start')}</button>${started?`<button class="btn" data-a="close">${t('close')}</button>`:''}</div>`)}
+let pend=null; // move awaiting discard / noble choice
+function discardModal(){const {tok,d,need}=pend;
+  showModal(`<h2>${t('discardT',need-sum(d))}</h2><p class="foot">${t('discardH')}</p>
+    <p class="cl"><b class="lab">${t('wDisc')}</b>${pend.sug.map((n,c)=>dot(c).repeat(n)).join('')}<button class="btn" data-a="dsug">${t('useSug')}</button></p>
+    <div class="drow">${[0,1,2,3,4,5].map(c=>tok[c]?`<div class="dcol"><i class="chip g${c}">${tok[c]-d[c]}</i><button class="btn" data-a="dplus" data-v="${c}" ${d[c]<tok[c]&&sum(d)<need?'':'disabled'} aria-label="discard ${t('colors')[c]}">−</button><button class="btn" data-a="dminus" data-v="${c}" ${d[c]?'':'disabled'} aria-label="keep ${t('colors')[c]}">+</button></div>`:'').join('')}</div>
+    <div class="drow"><button class="btn pri" data-a="dok" ${sum(d)===need?'':'disabled'}>${t('confirm')}</button><button class="btn" data-a="dcancel">${t('clear')}</button></div>`)}
+function summaryModal(){const order=ranking(),P=S.players,win=P[order[0]];
+  const rows=order.map((pid,k)=>{const p=P[pid],n=p.hist.length;
+    return `<tr class="${p.human?'you':''}"><td>${k+1}</td><td>${esc(p.name)}${p.human?'':' · '+t(p.type)}</td><td>${p.pts}</td><td>${p.cards.length}</td><td>${p.nobles.length}</td><td>${n}</td><td>${p.t15??'–'}</td><td>${n?(p.pts/n).toFixed(2):'–'}</td></tr>`}).join('');
+  const H=store.get('hist',[]),by={};
+  for(const g of H){const b=by[g.name]||(by[g.name]={n:0,w:0,ppt:0,t:[],name:g.name});b.n++;if(g.rank===1)b.w++;b.ppt+=g.ppt;if(g.t15)b.t.push(g.t15)}
+  const team=Object.values(by).sort((a,b)=>b.w/b.n-a.w/a.n||b.ppt/b.n-a.ppt/a.n).map(b=>`<tr><td></td><td>${esc(b.name)}</td><td>${b.n}</td><td>${b.w}</td><td>${(b.ppt/b.n).toFixed(2)}</td><td>${b.t.length?(sum(b.t)/b.t.length).toFixed(1):'–'}</td><td>${b.t.length?Math.min(...b.t):'–'}</td></tr>`).join('');
+  showModal(`<h2>${t('wins',esc(win.name))}</h2>${S.drill?drillResHTML():''}
+    <div class="tw"><table><tr><th>${t('rank')}</th><th>${t('player')}</th><th>${t('points')}</th><th>${t('cards')}</th><th>${t('noblesN')}</th><th>${t('turns')}</th><th>${t('t15')}</th><th>${t('ppt')}</th></tr>${rows}</table></div>
+    <h3>${t('chart')}</h3>${chart()}
+    <h3>${t('teamT')}</h3><div class="tw"><table><tr><th></th><th>${t('player')}</th><th>${t('games')}</th><th>${t('winsN')}</th><th>${t('avgPpt')}</th><th>${t('avgT15')}</th><th>${t('bestT15')}</th></tr>${team}</table></div>
+    <h3>${t('fullLog')}</h3><div style="max-height:220px;overflow:auto">${logPane(0)}</div>
+    <div class="drow"><button class="btn pri" data-a="review">${t('review')}</button><button class="btn" data-a="new">${t('newGame')}</button><button class="btn" data-a="copylog">${t('copyLog')}</button><button class="btn" data-a="undo">${t('undo')}</button><button class="btn" data-a="close">${t('close')}</button></div>`,true)}
+function chart(){const P=S.players,n=Math.max(...P.map(p=>p.hist.length),1),mx=Math.max(15,...P.map(p=>p.pts)),W_=560,H_=190,L=28,R=10,T=10,B=22;
+  const x=i=>L+(n>1?(i-1)*(W_-L-R)/(n-1):0),y=v=>T+(H_-T-B)*(1-v/mx);
+  let g='';for(let v=0;v<=mx;v+=5)g+=`<line x1="${L}" x2="${W_-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="${v===15?1.5:.6}" ${v===15?'stroke-dasharray="5 4"':''}/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
+  const step=Math.max(1,Math.ceil(n/10));for(let i=1;i<=n;i+=step)g+=`<text x="${x(i)}" y="${H_-6}" text-anchor="middle">${i}</text>`;
+  P.forEach((p,k)=>{if(!p.hist.length)return;const pts=p.hist.map((v,i)=>x(i+1)+','+y(v)).join(' ');
+    g+=`<polyline points="${pts}" fill="none" stroke="var(--p${k})" stroke-width="${p.human?3:1.8}" stroke-linejoin="round"/><circle cx="${x(p.hist.length)}" cy="${y(p.pts)}" r="3.5" fill="var(--p${k})"/>`});
+  return `<div class="tw"><svg class="chart" viewBox="0 0 ${W_} ${H_}" style="width:100%;min-width:320px;height:auto" role="img" aria-label="${t('chart')}">${g}</svg></div>
+    <div class="legend">${P.map((p,k)=>`<span><i style="background:var(--p${k})"></i>${esc(p.name)}</span>`).join('')}<span class="foot">x: ${t('turn')}</span></div>`}
+function ranking(){return [0,1,2,3].sort((a,b)=>S.players[b].pts-S.players[a].pts||S.players[a].cards.length-S.players[b].cards.length)}
+
+/* ---------- flow ---------- */
+function startGame(){const name=($('pname').value.trim()||'Player').slice(0,16),lv=[0,1,2].map(i=>$('lv'+i).value);
+  store.set('name',name);const dn=ui.drill||0;if(!dn)store.set('levels',lv);
+  S=newGame(shuffle([{name,type:'human',human:true},...lv.map((x,i)=>({name:t('bot','ABC'[i]),type:x}))]));
+  S.drill=dn;S.dst={missed:0,asked:0,ok:0};ui.dfb='';ui.dres=null;started=true;undo=[];clearTimeout(timer);timer=null;resetSel();closeModal();advance()}
+function resetSel(){ui.g=[];ui.card=null;ui.hint=null;ui.quiz=null}
+function advance(fromUndo){clearTimeout(timer);timer=null;
+  if(S.over){resetSel();render();finish();return}
+  if(S.players[S.cur].human){if(!fromUndo)undo.push(JSON.stringify(S));resetSel();if(ui.coach&&!S.drill)ui.hint=botHard(S,S.cur,true);startQuiz();render();return}
+  timer=setTimeout(()=>{timer=null;applyMove(S,S.cur,chooseMove(S,S.cur));advance()},ui.speed);
+  render()}
+function finish(){const me=meId(),p=S.players[me],n=p.hist.length,H=store.get('hist',[]).filter(g=>g.gid!==S.gid);
+  H.push({gid:S.gid,name:p.name,bots:S.players.filter(x=>!x.human).map(x=>x.type==='engine'?'n':x.type[0]).join(''),rank:ranking().indexOf(me)+1,pts:p.pts,turns:n,t15:p.t15,ppt:n?p.pts/n:0});
+  store.set('hist',H.slice(-300));ui.dres=S.drill?drillResult():null;summaryModal()}
+function commit(m){const me=meId();if(S.drill===2&&m.t==='take'&&!m.asked){ui.quiz={type:2,m};render();return}
+  const c=clone(S);applyMove(c,me,{...m,d:[0,0,0,0,0,0]});
+  const cp=c.players[me],over=sum(cp.tok)-10;
+  if(over>0&&!m.d){pend={m,tok:cp.tok.slice(),d:[0,0,0,0,0,0],need:over,sug:autoDiscard(c,me,over)};discardModal();return}
+  const q=S.nobles.filter(n=>qualifies(cp,n));
+  if(q.length>1&&m.n==null){pend={m};showModal(`<h2>${t('nobleT')}</h2><div class="drow">${q.map(n=>nobleHTML(n,{a:'noble'})).join('')}</div>`);return}
+  if(S.drill===1){const P1=S.players[me],A=m.t==='buy'?[]:vis(S,me,true).filter(x=>payment(P1,CARDS[x.id]).ok);if(A.length){S.dst.missed++;ui.dfb=t('d1F')+' '+A.map(x=>mini(x.id)).join(' ')}else ui.dfb=''}
+  pend=null;closeModal();const coach=mstr((ui.hint||botHard(S,me,true)).m);applyMove(S,me,m).coach=coach;advance()}
+
+const ACT={
+  tok(v){if(!myTurn()||ui.quiz)return;const c=+v;ui.card=null;const g=ui.g;
+    if(g.includes(c)){if(g.length===1&&S.bank[c]>=4)ui.g=[c,c];else ui.g=g.filter(x=>x!==c)}
+    else if(g.length===2&&g[0]===g[1])ui.g=[c];
+    else if(g.length<3)g.push(c);
+    render()},
+  card(v){const [l,i]=v.split(',').map(Number),id=S.board[l][i];if(ui.quiz&&ui.quiz.type===2){answer2(id);return}if(!myTurn()||ui.quiz)return;ui.g=[];ui.card=ui.card&&ui.card.id===id&&!ui.card.deck?null:{l,i,id};render()},
+  resc(v){const r=+v;if(ui.quiz&&ui.quiz.type===2){answer2(S.players[meId()].res[r].id);return}if(!myTurn()||ui.quiz)return;ui.g=[];ui.card=ui.card&&ui.card.r===r?null:{r,id:S.players[meId()].res[r].id};render()},
+  deck(v){if(!myTurn()||ui.quiz)return;const l=+v;ui.g=[];ui.card=ui.card&&ui.card.deck&&ui.card.l===l?null:{deck:true,l};render()},
+  clear(){ui.g=[];ui.card=null;render()},
+  take(){if(myTurn()&&ui.g.length)commit({t:'take',g:ui.g.slice()})},
+  buy(){const c=ui.card;if(!myTurn()||!c||c.deck)return;commit(c.r!=null?{t:'buy',r:c.r,id:c.id}:{t:'buy',l:c.l,i:c.i,id:c.id})},
+  reserve(){const c=ui.card;if(!myTurn()||!c||c.r!=null)return;commit(c.deck?{t:'res',l:c.l,deck:true}:{t:'res',l:c.l,i:c.i,id:c.id})},
+  pass(){if(myTurn())commit({t:'pass'})},
+  dplus(v){pend.d[+v]++;discardModal()},dminus(v){pend.d[+v]--;discardModal()},
+  dsug(){pend.d=pend.sug.slice();discardModal()},dok(){const m={...pend.m,d:pend.d};commit(m)},dcancel(){pend=null;closeModal()},
+  noble(v){commit({...pend.m,n:+v})},
+  hint(){if(myTurn()&&!S.drill){ui.hint=botHard(S,S.cur,true);render()}},
+  coach(){ui.coach=!ui.coach;store.set('coach',ui.coach);if(!ui.coach)ui.hint=null;else if(S&&myTurn()&&!S.drill)ui.hint=botHard(S,S.cur,true);render()},
+  lang(){lang=lang==='en'?'th':'en';store.set('lang',lang);document.documentElement.lang=lang;if(S){S.players.forEach(p=>{const m=/^(Bot|บอท) ([ABC])$/.exec(p.name);if(m&&!p.human)p.name=t('bot',m[2])});render()}else rTools();
+    if(simSt.open)simModal();else if(modal){if($('pname'))setupModal();else if(S.over)summaryModal();else if(pend&&pend.d)discardModal()}},
+  tab(v){ui.tab=v;store.set('tab',v);render()},
+  undo(){if(!S||timer)return;if(S.over){if(!undo.length)return}else{if(undo.length<2)return;undo.pop()}
+    S=JSON.parse(undo[undo.length-1]);pend=null;closeModal();advance(true)},
+  copylog(){if(S)copyModal()},
+  review(){if(S)reviewModal()},rsel(v){reviewModal(+v)},
+  docopy(){const el=$('cptx'),ok=()=>{$('cpst')&&($('cpst').textContent=t('copied'))},old=()=>{try{el.focus();el.select();if(document.execCommand('copy'))ok()}catch(e){}};
+    el.focus();el.select();try{navigator.clipboard.writeText(el.value).then(ok,old)}catch(e){old()}},
+  sim(){simModal()},
+  simtog(v){const i=simSt.keys.indexOf(v);if(i<0)simSt.keys.push(v);else simSt.keys.splice(i,1);simModal()},
+  simrun(){if(simSt.run||simSt.keys.length<2)return;simSt.ran=simSt.keys.slice();simSt.acc={};simSt.done=0;simSt.run=true;simModal();setTimeout(simStep,30)},
+  new(){setupModal()},start(){startGame()},close(){closeModal()},summary(){summaryModal()}
+};
+Object.assign(ACT,ACT_EXTRA);
+document.addEventListener('click',ev=>{const el=ev.target.closest('[data-a]');if(!el||el.disabled)return;const f=ACT[el.dataset.a];if(f)f(el.dataset.v)});
+document.addEventListener('change',ev=>{if(ev.target.id==='simn')simSt.n=+ev.target.value;if(ev.target.id==='drill'){store.set('name',$('pname').value.trim());ui.drill=+ev.target.value;setupModal()}
+  if(ev.target.id==='speed'){ui.speed=+ev.target.value;store.set('speed',ui.speed)}});
+document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.id==='pname')startGame()});
+const bad=dataCheck();if(bad.length)console.error('Card data check failed:',bad);
+document.documentElement.lang=lang;
+// Open on a live table so the first view shows the game, then ask for names and bot levels.
+S=newGame(shuffle([{name:store.get('name','')||'Player',type:'human',human:true},{name:t('bot','A'),type:'easy'},{name:t('bot','B'),type:'medium'},{name:t('bot','C'),type:'hard'}]));
+timer=-1;render();timer=null;setupModal();
+}
+</script>
+<!--BODY-END-->
+</body>
+</html>
